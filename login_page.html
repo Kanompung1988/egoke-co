@@ -1,29 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-	<meta charset="utf-8" />
-	<meta name="viewport" content="width=device-width,initial-scale=1" />
-	<title>EGOKE — Login</title>
-	<link rel="stylesheet" href="styles.css" />
-	<script src="script.js"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>EGOKE — Login</title>
+    <link rel="stylesheet" href="styles.css" />
 </head>
-
 <body>
-	<main class="page">
-		<section class="card" aria-labelledby="login-title">
-			<h1 id="login-title" class="brand">EGOKE</h1>
-			<p class="lead">login to your account</p>
-			<button id="loginButton">Login with Google</button>
-			</form>
-
-			<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-			<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
-			<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-		</section>
-	</main>
-
-	<script src="script.js" defer></script>
+    <main class="page">
+        <section class="card" aria-labelledby="login-title">
+            <h1 id="login-title" class="brand">EGOKE</h1>
+            
+            <div id="userInfo" style="display: none;">
+                <h2 id="userName"></h2>
+                <p>Email: <span id="userEmail"></span></p>
+                <p>แต้มสะสม: <span id="userPoints">0</span></p>
+                <button id="logoutButton">ออกจากระบบ</button>
+            </div>
+            
+            <div id="loginButton">
+                <p class="lead">login to your account</p>
+                <button>Login with Google</button>
+            </div>
+            
+            <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+            <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+            <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+        </section>
+    </main>
+    <script src="script.js" defer></script>
 </body>
-
-</html>
+</html>	
