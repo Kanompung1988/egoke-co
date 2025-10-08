@@ -1,0 +1,98 @@
+/* Simple responsive login page styles for login_page.html */
+:root{
+  --bg: #f3f7fa;
+  --card: #ffffff;
+  --bg-overlay: rgba(255,255,255,0.48);
+  --card-opacity: 0.96;
+  --muted: #5a6a7a;
+  --brand: #1e3a5c;    /* Deep blue from Arywork logo */
+  --accent: #fbbf24;   /* Gold/yellow accent */
+  --danger: #e11d48;
+  --radius: 12px;
+  --shadow: 0 6px 18px rgba(30,58,92,0.10);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+body{
+  margin:0;
+  /* use the logo as a sharp background (no overlay) and size/position it so the word "EGOKE" is visible */
+  background-image: url("Artwork.png");
+  background-repeat: no-repeat;
+  /* make the logo fit and show the central/upper portion where the word likely sits */
+  background-position: center 18%;
+  /* use a smaller background size so the logo (EGOKE) is visible and not cropped */
+  background-size: cover;
+  background-color:var(--bg);
+  color:#0f172a;
+  -webkit-font-smoothing:antialiased;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  padding:24px;
+  /* avoid fixed attachment to prevent visual artifacts on some browsers */
+  background-attachment:scroll;
+}
+
+.page{width:100%;max-width:420px}
+
+.card{
+  /* more transparent card so the full background reads through */
+  background: rgba(255,255,255,0.78);
+  border-radius:var(--radius);
+  padding:28px;
+  box-shadow:var(--shadow);
+  border:1px solid rgba(15,23,42,0.06);
+}
+
+.brand{margin:0;font-size:1.5rem;color:var(--brand);letter-spacing:0.4px}
+.lead{margin-top:8px;margin-bottom:18px;color:var(--muted)}
+
+.form{display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:8px}
+.field label{font-size:0.9rem;color:#111827}
+.field input{
+  width:100%;
+  padding:14px 18px;
+  border-radius:28px;
+  border:none;
+  /* highly transparent inputs so the background shows through clearly */
+  background: rgba(255,255,255,0.06);
+  color: #ffffff;
+  font-size:0.95rem;
+  border:1px solid rgba(255,255,255,0.12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 6px 18px rgba(2,6,23,0.04);
+  text-shadow: 0 1px 0 rgba(0,0,0,0.35);
+  transition:box-shadow .15s ease, transform .08s ease;
+}
+.field input::placeholder{color:rgba(15,23,42,0.48)}
+.field input:focus{outline:none;box-shadow:0 10px 24px rgba(2,6,23,0.08), inset 0 1px 0 rgba(255,255,255,0.86);transform:translateY(-1px)}
+.passwordWrap{display:flex;align-items:center;gap:8px}
+.passwordWrap .toggle{background:none;border:1px solid rgba(15,23,42,0.06);padding:6px 8px;border-radius:8px;cursor:pointer}
+
+.row{display:flex;align-items:center}
+.between{justify-content:space-between}
+.remember{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:0.95rem}
+.link{color:var(--brand);text-decoration:none;font-size:0.95rem}
+.link:hover{text-decoration:underline}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 14px;border-radius:10px;border:none;cursor:pointer;font-weight:600}
+.btn.primary{background:var(--brand);color:white}
+.btn.primary:hover{filter:brightness(0.98)}
+.btn.social{background:#111827;color:white;width:100%}
+.btn.social.outlined{background:transparent;color:#111827;border:1px solid rgba(15,23,42,0.08)}
+
+.divider{display:flex;align-items:center;gap:12px;margin:6px 0}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(15,23,42,0.04)}
+.divider span{font-size:0.85rem;color:var(--muted)}
+
+.socials{display:flex;flex-direction:column;gap:8px}
+.muted{font-size:0.9rem;color:var(--muted);text-align:center;margin-top:6px}
+.error{color:var(--danger);font-size:0.85rem;min-height:18px}
+
+@media (max-width:420px){
+  .card{padding:20px}
+  body{padding:18px}
+}

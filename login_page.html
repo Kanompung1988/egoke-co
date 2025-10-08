@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>EGOKE — Login</title>
+		<link rel="stylesheet" href="styles.css" />
+	</head>
+	<body>
+		<main class="page"> 
+			<section class="card" aria-labelledby="login-title">
+				<h1 id="login-title" class="brand">EGOKE</h1>
+
+				<p class="lead">login to your account</p>
+
+				<form id="loginForm" class="form" novalidate>
+					<div class="field">
+						<label for="email">Email(mahidol)</label>
+						<input id="email" name="email" type="email" inputmode="email" placeholder="you@example.com" required />
+						<div class="error" id="emailError" aria-live="polite"></div>
+					</div>
+
+					<div class="field">
+						<label for="password">Password</label>
+						<div class="passwordWrap">
+							<input id="password" name="password" type="password" placeholder="Enter your password" required minlength="6" />
+							<button type="button" id="togglePwd" class="toggle" aria-label="Show password">Show</button>
+						</div>
+						<div class="error" id="passwordError" aria-live="polite"></div>
+					</div>
+
+					<div class="row between">
+						<label class="remember">
+							<input type="checkbox" id="remember" name="remember" />
+							Remember me
+						</label>
+						<a class="link" href="#">Forgot password?</a>
+					</div>
+
+					<button class="btn primary" type="submit">log in</button>
+
+
+					
+				</form>
+			</section>
+		</main>
+
+		<script src="script.js" defer></script>
+	</body>
+</html>
