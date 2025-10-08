@@ -1,5 +1,6 @@
-/* Simple responsive login page styles for login_page.html */
-:root{
+
+
+:root{  
   --bg: #f3f7fa;
   --card: #ffffff;
   --bg-overlay: rgba(255,255,255,0.48);
