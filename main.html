@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en" data-theme="bumblebee">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EG-OKE Concert 2025</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap"
+    rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet">
+
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link rel="stylesheet" href="styles.css">
+
+  <style>
+    /* เพิ่มสไตล์เล็กน้อยสำหรับพื้นหลังธีม Matsuri */
+    body {
+      background-image: url('https://www.toptal.com/designers/subtlepatterns/uploads/seigaiha.png');
+      background-size: cover;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4">
+
+  <div class="card w-full max-w-md bg-base-100 shadow-xl">
+    <figure class="px-10 pt-10">
+      <div class="avatar">
+        <div class="w-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
+          <img id="userImage" src="https://via.placeholder.com/150" alt="User Profile Image" />
+        </div>
+      </div>
+    </figure>
+    <div class="card-body items-center text-center">
+      <h2 class="card-title text-3xl">
+        สวัสดี, <span id="userName">......</span>!
+      </h2>
+      <p>ยินดีต้อนรับสู่ EG-OKE Concert 2025 🏮</p>
+
+      <div class="stats bg-primary text-primary-content mt-4">
+        <div class="stat">
+          <div class="stat-title">แต้มสะสม</div>
+          <div id="userPoints" class="stat-value">---</div>
+          <div class="stat-desc">สะสมเพื่อแลกของรางวัล!</div>
+        </div>
+      </div>
+
+      <div class="card-actions mt-6">
+        <button class="btn btn-error" id="logoutButton">
+          <i class="ri-logout-box-r-line"></i>
+          ออกจากระบบ
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="card-actions mt-6">
+    <a href="/gacha.html" class="btn btn-accent">
+      <i class="ri-gift-2-line"></i>
+      ไปที่หน้าสุ่มกาชา
+    </a>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="script.js"></script>
+</body>
+
+</html>

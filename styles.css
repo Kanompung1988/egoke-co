@@ -48,6 +48,11 @@ body{
   border:1px solid rgba(15,23,42,0.06);
 }
 
+.userData{
+  color: #f3f7fa;
+  text-shadow: 2px 2px 4px #000000;     
+}
+
 .brand{margin:0;font-size:1.5rem;color:var(--brand);letter-spacing:0.4px}
 .lead{margin-top:8px;margin-bottom:18px;color:var(--muted)}
 
