@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" data-theme="night">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EG-OKE - Gacha Wheel</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet">
+  
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      background: linear-gradient(to bottom, #1E293B, #0F172A);
+    }
+  </style>
+</head>
+
+<body class="p-4 md:p-8">
+  <div class="container mx-auto max-w-4xl">
+
+    <div class="navbar bg-base-200 rounded-box mb-6">
+      <div class="flex-1">
+        <a href="/main.html" class="btn btn-ghost text-xl">🏮 EG-OKE Gacha</a>
+      </div>
+      <div class="flex-none">
+        <div class="stat bg-primary text-primary-content rounded-lg p-2 text-center">
+          <div class="stat-title text-sm">แต้มของคุณ</div>
+          <div id="userPoints" class="stat-value text-2xl">...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <div class="card bg-base-200 shadow-xl flex items-center justify-center p-6">
+        <div class="relative w-full max-w-sm aspect-square">
+            <canvas id="gachaWheel" width="500" height="500"></canvas>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[100%] z-10">
+                <div class="w-0 h-0 border-x-8 border-x-transparent border-b-[16px] border-b-secondary rotate-180"></div>
+            </div>
+        </div>
+        <button id="spinButton" class="btn btn-primary btn-lg mt-6 w-full">
+            <i class="ri-play-fill"></i> สุ่มเลย! (ใช้ <span id="spinCostText">20</span> แต้ม)
+        </button>
+      </div>
+
+      <div class="card bg-base-200 shadow-xl">
+        <div class="card-body">
+          <h2 class="card-title">ประวัติการสุ่มล่าสุด</h2>
+          <div class="divider mt-0"></div>
+          <ul id="historyList" class="menu p-0">
+            <li class="text-center p-4">กำลังโหลดประวัติ...</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="resultModal" class="modal">
+    <div class="modal-box">
+      <h3 class="font-bold text-2xl text-center">🎉 ยินดีด้วย! 🎉</h3>
+      <p id="prizeText" class="py-4 text-xl text-center font-bold text-accent">คุณได้รับ...</p>
+      <div class="modal-action">
+        <form method="dialog">
+          <button class="btn btn-primary w-full">รับทราบ</button>
+        </form>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/winwheeljs@2.8.0/dist/Winwheel.min.js"></script>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="gacha.js"></script>
+
+</body>
+</html>

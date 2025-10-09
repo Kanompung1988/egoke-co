@@ -1,5 +1,5 @@
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY", // <-- กรุณาใส่ Key จริงของคุณ
+    apiKey: "AIzaSyDCjt8DfkKCsjc73Oaay851FYu8pG1-3TY", // โปรดใช้คีย์ของคุณ
     authDomain: "egoke-7dae5.firebaseapp.com",
     projectId: "egoke-7dae5",
     storageBucket: "egoke-7dae5.appspot.com",
@@ -8,75 +8,110 @@ const firebaseConfig = {
     measurementId: "G-10MPJ3TPEB"
 };
 
-firebase.initializeApp(firebaseConfig);
 
+firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-const loginButton = document.getElementById('loginButton');
-const logoutButton = document.getElementById('logoutButton');
-const userInfoDiv = document.getElementById('userInfo');
-const userNameH2 = document.getElementById('userName');
-const userEmailSpan = document.getElementById('userEmail');
-const userPointsSpan = document.getElementById('userPoints');
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    auth.onAuthStateChanged((user) => {
+        const isMainPage = window.location.pathname.includes('main.html');
+
+        if (user) {
+            if (isMainPage) {
+                fetchAndDisplayUserData(user);
+            } else {
+
+                window.location.href = "main.html";
+            }
+        } else {
+            if (isMainPage) {
+                window.location.href = "login_page.html";
+            }
+        }
+    });
+
+
+    const loginButton = document.getElementById('loginButton');
+    if (loginButton) {
+        loginButton.addEventListener('click', loginWithGoogle);
+    }
+
+    // สำหรับหน้า Main
+    const logoutButton = document.getElementById('logoutButton');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', logout);
+    }
+
+});
+
+
+// --- Functions ---
 
 function loginWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
     auth.signInWithPopup(provider)
         .then((result) => {
             const user = result.user;
-            handleUserData(user);
+            checkAndCreateUser(user);
         })
         .catch((error) => {
-            console.error("Error during login:", error);
+            console.error("Login Error:", error);
         });
 }
 
-loginButton.addEventListener('click', loginWithGoogle);
-logoutButton.addEventListener('click', logout);
-
-function handleUserData(user) {
+function checkAndCreateUser(user) {
     if (!user) return;
     const userRef = db.collection('users').doc(user.uid);
+
     userRef.get().then((doc) => {
-        if (doc.exists) {
-            const userData = doc.data();
-            updateUI(userData);
-        } else {
+        if (!doc.exists) {
             const newUser = {
                 uid: user.uid,
                 displayName: user.displayName,
                 email: user.email,
-                points: 0
+                points: 0 
             };
             userRef.set(newUser).then(() => {
-                updateUI(newUser);
-            });
+                console.log("New user created in Firestore.");
+            }).catch(error => console.error("Error creating user:", error));
         }
     }).catch((error) => {
         console.error("Error getting user document:", error);
     });
-};
+}
 
-function updateUI(userData) {
-    loginButton.style.display = 'none';
-    userInfoDiv.style.display = 'block';
-    userNameH2.textContent = `สวัสดี, ${userData.displayName}`;
-    userEmailSpan.textContent = userData.email;
-    userPointsSpan.textContent = userData.points;
-};
+function fetchAndDisplayUserData(user) {
+    const userRef = db.collection('users').doc(user.uid);
+    const userNameEl = document.getElementById('userName');
+    const userPointsEl = document.getElementById('userPoints');
+    const userImageEl = document.getElementById('userImage'); // สำหรับรูปโปรไฟล์
 
-auth.onAuthStateChanged((user) => {
-    if (user) {
-        handleUserData(user);
-    } else {
-        loginButton.style.display = 'block';
-        userInfoDiv.style.display = 'none';
-    }
-});
+    userRef.get().then((doc) => {
+        if (doc.exists && userNameEl && userPointsEl) {
+            const userData = doc.data();
+            userNameEl.textContent = `${userData.displayName}`;
+            userPointsEl.textContent = `${userData.points}`; // แสดงแค่ตัวเลข
+            
+            // แสดงรูปโปรไฟล์
+            if(userImageEl && user.photoURL) {
+                userImageEl.src = user.photoURL;
+            }
+
+        } else {
+            console.log("No such user document or element not found!");
+        }
+    }).catch((error) => {
+        console.error("Error fetching user data:", error);
+    });
+}
 
 function logout() {
-    auth.signOut().catch((error) => {
+    auth.signOut().then(() => {
+        console.log("User signed out.");
+    }).catch((error) => {
         console.error("Sign out error:", error);
     });
-};
+}
