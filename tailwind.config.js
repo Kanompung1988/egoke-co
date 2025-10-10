@@ -23,8 +23,9 @@ export default {
         sans: ["Plus Jakarta Sans", "sans-serif"],
     },
     plugins: [
-        require('daisyui'),
+        require("daisyui"),
     ],
-    
-
+    daisyui: {
+        themes: false,
+    },
 }
