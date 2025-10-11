@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/busboy": "^1.5.4",
+    "auth": "^1.2.3",
+    "busboy": "^1.6.0",
     "firebase": "^12.4.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
