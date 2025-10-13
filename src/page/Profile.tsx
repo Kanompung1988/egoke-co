@@ -59,7 +59,7 @@ export default function Me() {
                             <button
                                 onClick={handleLogout}
                                 // จอมือถือปุ่มจะยาวเต็ม, จอใหญ่จะสั้นลง
-                                className="btn btn-ghost w-full md:w-auto mt-4 text-red-500 dark:text-red-400"
+                                className="btn btn-ghost mt-4 text-red-500 dark:text-red-400 border border-red-500 dark:border-red-400 hover:bg-red-500 hover:text-white transition-colors duration-300 rounded-xl px-6 py-2 items-center justify-center gap-2"
                             >
                                 Logout
                             </button>

@@ -54,7 +54,7 @@ export default function Login() {
                 {/* --- MODIFIED: ใช้ Conditional Rendering --- */}
                 {showStaffForm ? (
                     // --- ฟอร์มสำหรับ Staff ---
-                    <div className="space-y-4">
+                    /* <div className="space-y-4">
                         <input
                             type="text"
                             placeholder="Staff Code"
@@ -68,20 +68,58 @@ export default function Login() {
                         <button onClick={() => setShowStaffForm(false)} className="text-sm text-gray-500 hover:underline">
                             Back
                         </button>
+                    </div> */
+                    < div className="space-y-4">
+                        <input
+                            type="text"
+                            placeholder="Staff Code"
+                            value={staffCode}
+                            onChange={(e) => setStaffCode(e.target.value)}
+                            className="input input-bordered w-full bg-white/90 text-gray-800 placeholder:text-gray-500 border border-[#e5e5e5] rounded-xl shadow focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                        <button
+                            onClick={handleStaffLogin}
+                            disabled={isLoading}
+                            className="btn bg-blue-500 focus:bg-blue-700 text-white w-full rounded-xl py-3 flex items-center justify-center gap-2 shadow transition border border-blue-600 "
+                        >
+                            <svg aria-label="Staff icon" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <circle cx="12" cy="8" r="4" />
+                                <path d="M4 20c0-4 8-4 8-4s8 0 8 4" />
+                            </svg>
+                            {isLoading ? "Loading..." : "Login as Staff"}
+                        </button>
+                        <button
+                            onClick={() => setShowStaffForm(false)}
+                            className="text-sm text-gray-400 active:text-blue-600 active:underline transition"
+                        >
+                            กลับหน้าหลัก
+                        </button>
                     </div>
                 ) : (
                     // --- ปุ่มล็อกอินสำหรับคนทั่วไป ---
                     <div className="space-y-6">
-                        <button onClick={handleGoogleLogin} disabled={isLoading} className="btn bg-white text-black border border-[#e5e5e5] w-full rounded-xl py-3 flex items-center justify-center gap-2">
-                             <svg aria-label="Google logo" width="16" height="16" xmlns="http://www.w.org/2000/svg" viewBox="0 0 512 512"><g><path d="m0 0H512V512H0" fill="#fff"></path><path fill="#34a853" d="M153 292c30 82 118 95 171 60h62v48A192 192 0 0190 341"></path><path fill="#4285f4" d="m386 400a140 175 0 0053-179H260v74h102q-7 37-38 57"></path><path fill="#fbbc02" d="m90 341a208 200 0 010-171l63 49q-12 37 0 73"></path><path fill="#ea4335" d="m153 219c22-69 116-109 179-50l55-54c-78-75-230-72-297 55"></path></g></svg>
+                        <button onClick={handleGoogleLogin} disabled={isLoading} className="btn bg-white text-black border border-[#cacaca] w-full rounded-xl py-3 flex items-center justify-center gap-2">
+                            <svg aria-label="Google logo" width="16" height="16" xmlns="http://www.w.org/2000/svg" viewBox="0 0 512 512"><g><path d="m0 0H512V512H0" fill="#fff"></path><path fill="#34a853" d="M153 292c30 82 118 95 171 60h62v48A192 192 0 0190 341"></path><path fill="#4285f4" d="m386 400a140 175 0 0053-179H260v74h102q-7 37-38 57"></path><path fill="#fbbc02" d="m90 341a208 200 0 010-171l63 49q-12 37 0 73"></path><path fill="#ea4335" d="m153 219c22-69 116-109 179-50l55-54c-78-75-230-72-297 55"></path></g></svg>
                             {isLoading ? "Loading..." : "Login with Google"}
                         </button>
-                        <button onClick={() => setShowStaffForm(true)} className="text-sm text-gray-600 dark:text-gray-400 hover:underline">
+                        {/* <button onClick={() => setShowStaffForm(true)} className="text-sm text-gray-600 dark:text-gray-400 hover:underline">
+                            Staff Login
+                        </button> */}
+
+                        <button
+                            onClick={() => setShowStaffForm(true)}
+                            className="btn bg-white/80 backdrop-blur-md text-black border border-[#cacaca] w-full rounded-xl py-3 flex items-center justify-center gap-2 shadow transition"
+                        >
+                            <svg aria-label="Staff icon" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <circle cx="12" cy="8" r="4" />
+                                <path d="M4 20c0-4 8-4 8-4s8 0 8 4" />
+                            </svg>
                             Staff Login
                         </button>
+
                     </div>
                 )}
             </section>
-        </main>
+        </main >
     );
 }
