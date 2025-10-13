@@ -24,7 +24,7 @@ type HistoryItem = {
     ticketId?: string
 }
 
-const DEFAULT_SPIN_COST = 0 // points to deduct per spin (can be changed)
+const DEFAULT_SPIN_COST = 20 // points to deduct per spin (can be changed)
 
 export default function Game() {
     const [user, setUser] = useState<User | null>(null)
@@ -67,7 +67,6 @@ export default function Game() {
             }
         })
         return () => un()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     async function loadUserPoints(uid: string) {
@@ -162,13 +161,11 @@ export default function Game() {
                 totalPrizes: prizes.length 
             })
 
-            // Calculate rotation for wheel spin
+  
             const segAngle = 360 / prizes.length
-            const spinRotations = 5 // minimum full rotations
-            const extraRotations = Math.random() * 3 // 0-3 additional rotations
-            
-            // Calculate target angle - adjust to point arrow at top to the prize
-            // Arrow is at top (0°), prizes rotate, so we need to rotate wheel so prize ends at top
+            const spinRotations = 5 
+            const extraRotations = Math.random() * 3 
+  
             const targetAngle = 360 - (prizeIndex * segAngle + segAngle / 2)
             const totalRotation = (spinRotations + extraRotations) * 360 + targetAngle
             const newRotation = currentRotationRef.current + totalRotation
@@ -224,7 +221,7 @@ export default function Game() {
                 ].slice(0, 20)) // Keep only last 20 items
             } catch (dbError: any) {
                 console.error("❌ Database error:", dbError)
-                // If permission error, still show the prize but with warning
+          
                 if (dbError?.code === 'permission-denied') {
                     console.warn("⚠️ Permission denied for database write, showing prize anyway")
                     const ticketId = generateTicketId()

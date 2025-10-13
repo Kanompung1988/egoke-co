@@ -54,8 +54,8 @@ export default function BottomNav() {
                             <span className="text-xs font-medium">IG</span>
                         </Link>
 
-                        {/* Points */}
-                        <Link to="/points" className={`flex flex-col items-center justify-center transition-transform ${current === "/points" ? "text-primary text-3xl" : "text-gray-500 hover:text-primary text-2xl"}`}>
+                        {/* Profile */}
+                        <Link to="/profile" className={`flex flex-col items-center justify-center transition-transform ${current === "/profile" ? "text-primary text-3xl" : "text-gray-500 hover:text-primary text-2xl"}`}>
                             <i className="ri-user-fill"></i>
                             <span className="text-xs font-medium">Me</span>
                         </Link>

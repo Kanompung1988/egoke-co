@@ -14,6 +14,8 @@ import {
     doc, 
     getDoc, 
     setDoc, 
+    updateDoc, 
+    increment,
     type Firestore 
 } from "firebase/firestore";
 
@@ -138,6 +140,35 @@ export async function logout(): Promise<void> {
 
 export function watchAuthState(callback: (user: User | null) => void): Unsubscribe {
     return onAuthStateChanged(auth, callback);
+}
+
+export async function addPointsToUser(uid: string, pointsToAdd: number) {
+    // ตรวจสอบข้อมูลเบื้องต้น
+    if (!uid || !pointsToAdd || pointsToAdd <= 0) {
+        throw new Error("Invalid user ID or points value.");
+    }
+
+    // สร้าง reference ไปยังเอกสารของผู้ใช้คนนั้นๆ
+    const userRef = doc(db, "users", uid);
+
+    try {
+        // ใช้ increment() เพื่อบวกค่าใหม่เข้ากับค่าเก่าใน database โดยตรง
+        // วิธีนี้ปลอดภัยและป้องกันข้อมูลผิดพลาดกรณีมีคนแอดแต้มพร้อมกัน
+        await updateDoc(userRef, {
+            points: increment(pointsToAdd)
+        });
+
+        console.log(`Successfully added ${pointsToAdd} points to user ${uid}`);
+        
+        // ดึงข้อมูลล่าสุดหลังอัปเดตเสร็จ เพื่อส่งกลับไปแสดงผลที่หน้าจอทันที
+        const updatedDoc = await getDoc(userRef);
+        return updatedDoc.data();
+
+    } catch (error) {
+        console.error("Error adding points:", error);
+        // ส่ง error กลับไปให้หน้า UI รับรู้และแสดงข้อความแจ้งเตือน
+        throw error; 
+    }
 }
 /*
 const firebaseConfig = {
