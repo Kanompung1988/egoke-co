@@ -53,7 +53,7 @@ export default function QRScan() {
             setIsLoading(false);
         }
     };
-    
+
     // ฟังก์ชันสำหรับกดยืนยันการเพิ่มแต้ม (ปรับปรุงใหม่)
     const handleAddPoints = async () => {
         if (!scannedUser || pointsToAdd <= 0) {
@@ -108,12 +108,12 @@ export default function QRScan() {
                         </button>
                     </div>
                 )}
-                
+
                 {/* --- UI State 2: ฟอร์มกรอกคะแนนหลังสแกนเจอ --- */}
                 {scannedUser && (
                     <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg flex flex-col items-center gap-4">
-                        <img 
-                            src={`https://ui-avatars.com/api/?name=${scannedUser.displayName}&background=random`} 
+                        <img
+                            src={`https://ui-avatars.com/api/?name=${scannedUser.displayName}&background=random`}
                             alt="Profile"
                             className="w-24 h-24 rounded-full border-4 border-primary"
                         />
@@ -139,11 +139,11 @@ export default function QRScan() {
                         </div>
                     </div>
                 )}
-                
+
                 {/* --- UI State 3: หน้าสแกนเริ่มต้น --- */}
                 {isScanning && (
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
-                         <p className="text-center mb-4 text-gray-500 dark:text-gray-400">
+                        <p className="text-center mb-4 text-gray-500 dark:text-gray-400">
                             Point the camera at a user's QR code
                         </p>
                         <div className="overflow-hidden rounded-xl">
@@ -155,7 +155,7 @@ export default function QRScan() {
                 {/* แสดง Error Message (ถ้ามี) */}
                 {error && <p className="text-center text-red-500 mt-4">{error}</p>}
             </main>
-            
+
             <BottomNav />
         </div>
     );

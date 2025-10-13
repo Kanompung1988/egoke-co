@@ -21,19 +21,18 @@ export default function Me() {
                 <h1 className="text-3xl font-bold text-center mb-4">Your Profile</h1>
 
                 {currentUser ? (
-                    <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-2xl shadow-lg 
-                                  flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8">
-                        
+                    <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-2xl shadow-lg flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8">
+
                         {/* ส่วนที่ 1: รูปโปรไฟล์ (ซ้ายมือบนจอใหญ่) */}
                         <div className="flex-shrink-0">
-                            <img 
-                                src={currentUser.photoURL || 'https://via.placeholder.com/150'} 
+                            <img
+                                src={currentUser.photoURL || 'https://via.placeholder.com/150'}
                                 alt="Profile"
                                 // จอมือถือขนาด 128px, จอใหญ่ขนาด 192px
                                 className="w-32 h-32 md:w-48 md:h-48 rounded-full border-4 border-primary"
                             />
                         </div>
-                        
+
                         {/* ส่วนที่ 2: ข้อมูลทั้งหมด (ขวามือบนจอใหญ่) */}
                         <div className="flex flex-col items-center md:items-start w-full gap-4">
                             {/* ชื่อและอีเมล */}
@@ -50,14 +49,14 @@ export default function Me() {
                                     <span className="text-lg text-gray-600 dark:text-gray-300">Points</span>
                                 </div>
                             </div>
-                            
+
                             {/* QR Code */}
                             <div className="bg-white p-4 rounded-lg">
                                 <QRCode value={currentUser.uid} size={160} />
                             </div>
 
                             {/* ปุ่ม Logout */}
-                            <button 
+                            <button
                                 onClick={handleLogout}
                                 // จอมือถือปุ่มจะยาวเต็ม, จอใหญ่จะสั้นลง
                                 className="btn btn-ghost w-full md:w-auto mt-4 text-red-500 dark:text-red-400"
@@ -72,7 +71,7 @@ export default function Me() {
                     </div>
                 )}
             </main>
-            
+
             <BottomNav />
         </div>
     );

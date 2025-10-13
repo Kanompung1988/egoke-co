@@ -41,7 +41,6 @@ const QrScanner = ({ onScanSuccess, onScanFailure }: QrScannerProps) => {
     };
   }, [onScanSuccess, onScanFailure]);
 
- 
   return <div id="reader"></div>;
 };
 
