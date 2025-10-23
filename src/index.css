@@ -1,7 +1,83 @@
 @import "tailwindcss";
-@plugin "daisyui" {
-    themes: false;
+
+@plugin "daisyui/theme" {
+    name: "japan-festival";
+    default: true;
+    /* ให้ธีมนี้เป็น default */
+    prefersdark: false;
+    color-scheme: light;
+
+    /* ===============================
+    Colors (ใช้ oklch สำหรับความเข้มแม่นยำ)
+     =============================== */
+    --color-base-100: oklch(98% 0.02 80);
+    /* Paper Cream */
+    --color-base-200: oklch(95% 0.03 80);
+    --color-base-300: oklch(90% 0.04 80);
+    --color-base-content: oklch(20% 0.03 80);
+    /* ข้อความหลัก */
+
+    --color-primary: oklch(60% 0.25 25);
+    /* Torii Red (#E63946) */
+    --color-primary-content: oklch(98% 0.01 25);
+
+    --color-secondary: oklch(40% 0.08 250);
+    /* Indigo Yukata (#264653) */
+    --color-secondary-content: oklch(95% 0.02 250);
+
+    --color-accent: oklch(80% 0.18 90);
+    /* Gold Lantern (#FFB703) */
+    --color-accent-content: oklch(20% 0.02 90);
+
+    --color-neutral: oklch(25% 0.05 250);
+    /* Night Sky */
+    --color-neutral-content: oklch(95% 0.01 250);
+
+    --color-info: oklch(70% 0.18 220);
+    --color-info-content: oklch(98% 0.01 220);
+
+    --color-success: oklch(65% 0.20 140);
+    /* Bamboo Green */
+    --color-success-content: oklch(98% 0.01 140);
+
+    --color-warning: oklch(85% 0.18 90);
+    /* Lantern Yellow */
+    --color-warning-content: oklch(25% 0.05 90);
+
+    --color-error: oklch(60% 0.22 25);
+    /* Vermilion */
+    --color-error-content: oklch(98% 0.01 25);
+
+    /* ===============================
+     Radius, Border, and Effects
+     =============================== */
+    --radius-selector: 1rem;
+    --radius-field: 0.25rem;
+    --radius-box: 0.5rem;
+
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+
+    --border: 1px;
+
+    --depth: 1;
+    --noise: 0;
 }
+
+/* iPhone SE / 12 Mini */
+@media (max-width: 375px) {
+    .small-device {
+        font-size: 0.875rem;
+    }
+}
+
+/* iPad (แนวตั้ง / แนวนอน) */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .tablet-only {
+        padding: 1.5rem;
+    }
+}
+
 
 /* Custom scrollbar */
 .overflow-y-auto::-webkit-scrollbar {
@@ -44,6 +120,7 @@
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -54,6 +131,7 @@
         opacity: 0;
         transform: scale(0.8);
     }
+
     to {
         opacity: 1;
         transform: scale(1);
@@ -61,9 +139,12 @@
 }
 
 @keyframes bounce {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: translateY(0);
     }
+
     50% {
         transform: translateY(-20px);
     }
@@ -86,6 +167,7 @@
         opacity: 0;
         transform: translateX(-20px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);
@@ -100,6 +182,7 @@
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -114,6 +197,7 @@
         opacity: 0;
         transform: scale(0.9);
     }
+
     to {
         opacity: 1;
         transform: scale(1);
@@ -149,7 +233,7 @@
     border-radius: 50%;
     background: linear-gradient(135deg, #dc2626, #b91c1c);
     border: 8px solid #fff;
-    box-shadow: 
+    box-shadow:
         0 0 0 4px #dc2626,
         0 8px 32px rgba(0, 0, 0, 0.3),
         inset 0 4px 8px rgba(255, 255, 255, 0.2);
@@ -178,8 +262,13 @@
 }
 
 @keyframes shimmer {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .wheel-center {
@@ -213,12 +302,12 @@
     justify-content: center;
     font-weight: 800;
     font-size: 2rem;
-    box-shadow: 
+    box-shadow:
         0 10px 30px rgba(0, 0, 0, 0.5),
         inset 0 -8px 16px rgba(0, 0, 0, 0.3),
         inset 0 8px 16px rgba(255, 255, 255, 0.5);
     color: #fff;
-    text-shadow: 
+    text-shadow:
         0 3px 6px rgba(0, 0, 0, 0.6),
         0 0 25px rgba(255, 215, 0, 0.6);
     letter-spacing: 2px;
@@ -245,7 +334,7 @@
     height: 32px;
     background: radial-gradient(circle at 30% 30%, #fbbf24, #f59e0b);
     border-radius: 50%;
-    box-shadow: 
+    box-shadow:
         0 4px 12px rgba(0, 0, 0, 0.5),
         inset 0 2px 6px rgba(255, 255, 255, 0.4),
         inset 0 -2px 6px rgba(0, 0, 0, 0.3);
@@ -278,8 +367,10 @@
 }
 
 @keyframes pulse-glow {
-    0%, 100% {
-        box-shadow: 
+
+    0%,
+    100% {
+        box-shadow:
             0 0 0 8px rgba(255, 255, 255, 0.9),
             0 0 0 12px #f59e0b,
             0 8px 24px rgba(0, 0, 0, 0.4),
@@ -287,8 +378,9 @@
             inset 0 -6px 12px rgba(0, 0, 0, 0.3),
             inset 0 6px 12px rgba(255, 255, 255, 0.5);
     }
+
     50% {
-        box-shadow: 
+        box-shadow:
             0 0 0 8px rgba(255, 255, 255, 0.9),
             0 0 0 12px #f59e0b,
             0 8px 24px rgba(0, 0, 0, 0.4),
@@ -335,7 +427,7 @@
     border-radius: 50%;
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 248, 248, 0.95));
     font-size: 1.4rem;
-    box-shadow: 
+    box-shadow:
         0 0 0 2px rgba(255, 255, 255, 1),
         0 4px 12px rgba(0, 0, 0, 0.5),
         inset 0 2px 4px rgba(255, 255, 255, 0.8);
@@ -351,7 +443,7 @@
     font-weight: 900;
     font-size: 0.7rem;
     text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
-    box-shadow: 
+    box-shadow:
         0 0 0 2px rgba(255, 255, 255, 1),
         0 3px 10px rgba(0, 0, 0, 0.5),
         inset 0 2px 4px rgba(255, 255, 255, 0.6);
@@ -370,29 +462,29 @@
         height: 120px;
         font-size: 1.75rem;
     }
-    
+
     .wheel-rotating-indicator {
         /* Position at edge: half radius = 30px */
         top: -30px;
     }
-    
+
     .wheel-center-arrow {
         width: 28px;
         height: 28px;
     }
-    
+
     .wheel-center-arrow::before {
         border-left: 8px solid transparent;
         border-right: 8px solid transparent;
         border-bottom: 16px solid #fff;
     }
-    
+
     .prize-emoji {
         width: 38px;
         height: 38px;
         font-size: 1.3rem;
     }
-    
+
     .prize-text {
         font-size: 0.65rem;
         padding: 0.32rem 0.6rem;
@@ -404,38 +496,38 @@
         width: 110px;
         height: 110px;
         font-size: 1.6rem;
-        box-shadow: 
+        box-shadow:
             0 8px 24px rgba(0, 0, 0, 0.5),
             inset 0 -6px 12px rgba(0, 0, 0, 0.3),
             inset 0 6px 12px rgba(255, 255, 255, 0.5);
     }
-    
+
     .wheel-rotating-indicator {
         /* Position at edge: half radius = 27.5px */
         top: -27.5px;
     }
-    
+
     .wheel-center-arrow {
         width: 26px;
         height: 26px;
     }
-    
+
     .wheel-center-arrow::before {
         border-left: 7px solid transparent;
         border-right: 7px solid transparent;
         border-bottom: 14px solid #fff;
     }
-    
+
     .wheel-center-text {
         font-size: 1.6rem;
     }
-    
+
     .prize-emoji {
         width: 36px;
         height: 36px;
         font-size: 1.2rem;
     }
-    
+
     .prize-text {
         font-size: 0.6rem;
         padding: 0.3rem 0.55rem;
@@ -447,43 +539,43 @@
         inset: -10px;
         border-width: 6px;
     }
-    
+
     .wheel-center-button {
         width: 100px;
         height: 100px;
         font-size: 1.5rem;
-        box-shadow: 
+        box-shadow:
             0 6px 20px rgba(0, 0, 0, 0.5),
             inset 0 -6px 12px rgba(0, 0, 0, 0.3),
             inset 0 6px 12px rgba(255, 255, 255, 0.5);
     }
-    
+
     .wheel-rotating-indicator {
         /* Position at edge: half radius = 25px */
         top: -25px;
     }
-    
+
     .wheel-center-arrow {
         width: 24px;
         height: 24px;
     }
-    
+
     .wheel-center-arrow::before {
         border-left: 6px solid transparent;
         border-right: 6px solid transparent;
         border-bottom: 12px solid #fff;
     }
-    
+
     .wheel-center-text {
         font-size: 1.5rem;
     }
-    
+
     .prize-emoji {
         width: 32px;
         height: 32px;
         font-size: 1.1rem;
     }
-    
+
     .prize-text {
         font-size: 0.55rem;
         padding: 0.28rem 0.5rem;
@@ -496,43 +588,43 @@
         inset: -8px;
         border-width: 5px;
     }
-    
+
     .wheel-center-button {
         width: 90px;
         height: 90px;
         font-size: 1.35rem;
-        box-shadow: 
+        box-shadow:
             0 6px 18px rgba(0, 0, 0, 0.5),
             inset 0 -6px 12px rgba(0, 0, 0, 0.3),
             inset 0 6px 12px rgba(255, 255, 255, 0.5);
     }
-    
+
     .wheel-rotating-indicator {
         /* Position at edge: half radius = 22.5px */
         top: -22.5px;
     }
-    
+
     .wheel-center-arrow {
         width: 22px;
         height: 22px;
     }
-    
+
     .wheel-center-arrow::before {
         border-left: 6px solid transparent;
         border-right: 6px solid transparent;
         border-bottom: 12px solid #fff;
     }
-    
+
     .wheel-center-text {
         font-size: 1.35rem;
     }
-    
+
     .prize-emoji {
         width: 30px;
         height: 30px;
         font-size: 1rem;
     }
-    
+
     .prize-text {
         font-size: 0.52rem;
         padding: 0.26rem 0.48rem;
@@ -596,6 +688,7 @@
         opacity: 0;
         transform: translateX(-20px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);

@@ -26,7 +26,7 @@ export default function Login() {
         setIsLoading(true);
         const user = await loginWithGoogle();
         if (user) {
-            navigate("/Home");
+            navigate("/Home", { state: { justLoggedIn: true } });
         }
         setIsLoading(false);
     };
@@ -39,7 +39,7 @@ export default function Login() {
         setIsLoading(true);
         const { user, error } = await loginAsStaff(staffCode.trim());
         if (user) {
-            navigate("/Home");
+            navigate("/Home", { state: { justLoggedIn: true } });
         } else if (error) {
             window.alert(error);
         }
@@ -47,28 +47,13 @@ export default function Login() {
     };
 
     return (
-        <main className="min-h-screen flex items-center justify-center bg-[url('/Artwork.png')] bg-cover bg-center p-6">
+        <main className="min-h-screen flex items-center justify-center bg-[url('/Login-background.PNG')] bg-cover bg-center p-6">
             <section className="card bg-white/80 dark:bg-gray-900/80 p-8 rounded-2xl shadow-lg border border-gray-200 max-w-sm w-full text-center backdrop-blur-md">
                 <h1 className="text-3xl font-bold text-[#1e3a5c] mb-6 tracking-wide">EGOKE</h1>
 
                 {/* --- MODIFIED: ใช้ Conditional Rendering --- */}
                 {showStaffForm ? (
                     // --- ฟอร์มสำหรับ Staff ---
-                    /* <div className="space-y-4">
-                        <input
-                            type="text"
-                            placeholder="Staff Code"
-                            value={staffCode}
-                            onChange={(e) => setStaffCode(e.target.value)}
-                            className="input input-bordered w-full placeholder:text-white text-white"
-                        />
-                        <button onClick={handleStaffLogin} disabled={isLoading} className="btn bg-blue-600 text-white w-full">
-                            {isLoading ? "Loading..." : "Login as Staff"}
-                        </button>
-                        <button onClick={() => setShowStaffForm(false)} className="text-sm text-gray-500 hover:underline">
-                            Back
-                        </button>
-                    </div> */
                     < div className="space-y-4">
                         <input
                             type="text"
