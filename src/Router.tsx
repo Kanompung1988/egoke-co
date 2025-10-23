@@ -6,7 +6,6 @@ import Game from "./page/Game"
 import Profile from "./page/Profile"
 import Contact from "./page/Vap-ig"
 import QRScan from "./page/QRScan"
-
 // import หน้าอื่นๆ เพิ่มได้ เช่น import Profile from "./page/Profile"
 
 export default function AppRouter() {

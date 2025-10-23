@@ -80,8 +80,8 @@ export default function Home() {
                         </div>
 
                         <div className="p-4 sm:p-6 text-center">
-                            <h3 className="text-lg font-extrabold text-gray-900 dark:text-white mb-2">Welcome to EG'OKE 2025 🎉</h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">ขอบคุณที่เข้าสู่ระบบ — ดูข่าวสารและสิทธิพิเศษด้านล่าง</p>
+                            <h2 className="text-lg font-extrabold text-gray-900 dark:text-white mb-2">Welcome to EG'OKE 2025 🎉</h2>
+                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">ขอบคุณที่เข้าสู่ระบบ — ดูข่าวสารและกิจกรรมต่างในเว็บไซต์ได้เลย!</p>
 
                             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
                                 <label className="flex items-center gap-3 cursor-pointer select-none">
@@ -91,7 +91,7 @@ export default function Home() {
                                         onChange={(e) => setHideOnClose(e.target.checked)}
                                         className="w-4 h-4 accent-primary"
                                     />
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">ไม่ต้องแสดงอีก </span>
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">ไม่ต้องแสดงอีก</span>
                                 </label>
 
                                 <button
