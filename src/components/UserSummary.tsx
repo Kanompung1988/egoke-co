@@ -1,4 +1,3 @@
-import React from "react"
 import type { User } from "firebase/auth"
 
 export default function UserSummary({ user, points }: { user: User | null; points: number | null }) {

@@ -1,4 +1,3 @@
-import React from "react"
 
 type HistoryItem = {
     id?: string
@@ -29,7 +28,7 @@ export default function HistoryList({
                         <p className="text-xs text-gray-400 mt-1">หมุนวงล้อเพื่อรับรางวัลกันเลย!</p>
                     </div>
                 ) : (
-                    history.map((result, index) => (
+                    history.map((result) => (
                         <div
                             key={result.id ?? result.timestamp}
                             className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 hover:bg-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer"

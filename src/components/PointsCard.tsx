@@ -1,4 +1,4 @@
-import React from "react"
+
 
 export default function PointsCard({ points }: { points: number | null }) {
     return (

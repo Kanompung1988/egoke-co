@@ -1,4 +1,3 @@
-import React, { useRef } from "react"
 
 type Prize = { label: string; emoji?: string; color?: string }
 

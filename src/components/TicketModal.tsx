@@ -1,4 +1,3 @@
-import React from "react"
 
 type HistoryItem = {
     id?: string
