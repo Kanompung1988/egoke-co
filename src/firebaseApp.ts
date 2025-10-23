@@ -1,22 +1,22 @@
 import { initializeApp } from "firebase/app";
 import type { FirebaseApp } from "firebase/app";
-import { 
-    getAuth, 
-    onAuthStateChanged, 
-    GoogleAuthProvider, 
-    signInWithPopup, 
-    signOut, 
+import {
+    getAuth,
+    onAuthStateChanged,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signOut,
     type Unsubscribe,
-    type User 
+    type User
 } from "firebase/auth";
-import { 
-    getFirestore, 
-    doc, 
-    getDoc, 
-    setDoc, 
-    updateDoc, 
+import {
+    getFirestore,
+    doc,
+    getDoc,
+    setDoc,
+    updateDoc,
     increment,
-    type Firestore 
+    type Firestore
 } from "firebase/firestore";
 
 // ตั้งค่า Firebase
@@ -159,7 +159,7 @@ export async function addPointsToUser(uid: string, pointsToAdd: number) {
         });
 
         console.log(`Successfully added ${pointsToAdd} points to user ${uid}`);
-        
+
         // ดึงข้อมูลล่าสุดหลังอัปเดตเสร็จ เพื่อส่งกลับไปแสดงผลที่หน้าจอทันที
         const updatedDoc = await getDoc(userRef);
         return updatedDoc.data();
@@ -167,8 +167,39 @@ export async function addPointsToUser(uid: string, pointsToAdd: number) {
     } catch (error) {
         console.error("Error adding points:", error);
         // ส่ง error กลับไปให้หน้า UI รับรู้และแสดงข้อความแจ้งเตือน
-        throw error; 
+        throw error;
     }
+}
+
+export async function deductPointsFromUser(uid: string, pointsToDeduct: number) {
+
+    if (!uid || !pointsToDeduct || pointsToDeduct <= 0) {
+        throw new Error("Invalid user ID or points value.");
+    }
+
+    const userRef = doc(db, "users", uid);
+    try {
+        await updateDoc(userRef, {
+            points: increment(-pointsToDeduct)
+        });
+
+        console.log(`Successfully deducted ${pointsToDeduct} points from user ${uid}`);
+
+        const updatedDoc = await getDoc(userRef);
+        return updatedDoc.data();
+
+    } catch (error) {
+        console.error("Error deducting points:", error);
+        throw error;
+    }
+}
+
+export async function getUserProfile(uid: string)
+{
+    if(!uid) return;
+    const userRef = doc(db, "users", uid);
+    const docSnap = await getDoc(userRef);
+    return docSnap.exists() ? docSnap.data() : null;
 }
 /*
 const firebaseConfig = {
@@ -180,4 +211,4 @@ const firebaseConfig = {
     appId: "1:910235640821:web:cc5163a4eee3e8dffc76bc",
     measurementId: "G-10MPJ3TPEB",
 }
-    */
+*/
