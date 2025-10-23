@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import type { User } from "firebase/auth";
 import BottomNav from "../components/BottomNav";
 
-import { watchAuthState, getUserProfile, deductPointsFromUser } from "../firebaseApp";
+import { db, watchAuthState, getUserProfile, deductPointsFromUser } from "../firebaseApp";
+import { doc, onSnapshot, updateDoc, increment} from "firebase/firestore";
 
-const SUBMISSION_COST = 50; // แต้มที่ใช้ในการส่งวาร์ป
+const SUBMISSION_COST = 50;
+const MAX = 22;
 
 export default function Contact() {
   const [title, setTitle] = useState<string>("");
@@ -13,14 +15,17 @@ export default function Contact() {
 
   const [user, setUser] = useState<User | null>(null);
   const [userPoints, setUserPoints] = useState<number | null>(null);
+
+  const [pageLoading, setPageLoading] = useState<boolean>(true);
+  const [isWarpActive, setIsWarpActive] = useState<boolean>(false);
+  const [currentCount, setCurrentCount] = useState<number>(0);
+
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const MAX = 22; // จำกัดจำนวนผู้ส่งต่อรอบ
-  const [currentCount, setCurrentCount] = useState(14); // mock data: คนที่ส่งแล้ว
   const [activeTab, setActiveTab] = useState<"status" | "schedule" | "rules">("status");
 
 
@@ -41,17 +46,57 @@ export default function Contact() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const statusDocRef = doc(db, "warpStatus", "current");
+
+    const unsubscribe = onSnapshot(statusDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setIsWarpActive(data.canSend);
+        setCurrentCount(data.senderCount);
+      } else {
+        console.error("Warp status document does not exist!");
+        setIsWarpActive(false);
+      }
+      setPageLoading(false);
+    }, (err) => {
+      console.error("Error listening to warp status:", err);
+      setError("ไม่สามารถโหลดสถานะระบบได้");
+      setPageLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [db]);
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    setError(null);
+
+    if (pageLoading) {
+      setError("กำลังโหลดสถานะระบบ กรุณารอสักครู่");
+      return;
+    }
+
+    if (!isWarpActive) {
+      setError("ระบบยังไม่เปิดใช้งาน หรือรอบนี้เต็มแล้วครับ");
+      return;
+    }
+
+    if (currentCount >= MAX) {
+      setError("ขออภัย รอบนี้เต็มแล้วครับ");
+      return;
+    }
 
     if (!user) {
       setError("กรุณาล็อกอินก่อนส่งวาร์ปครับ");
       return;
     }
+
     if (!title || !imageFile) {
       setError("กรุณากรอกไอจีและเลือกรูปภาพด้วยครับ");
       return;
     }
+
     if (userPoints === null || userPoints < SUBMISSION_COST) {
       setError(`แต้มของคุณไม่พอ (ต้องใช้ ${SUBMISSION_COST} แต้ม)`);
       return;
@@ -95,7 +140,19 @@ export default function Contact() {
           await deductPointsFromUser(user.uid, SUBMISSION_COST);
           setUserPoints(prevPoints => (prevPoints !== null ? prevPoints - SUBMISSION_COST : null));
 
-          // แสดง success modal แทน alert
+          try {
+            const statusDocRef = doc(db, "warpStatus", "current");
+            await updateDoc(statusDocRef, {
+              senderCount: increment(1)
+            });
+          }
+          catch (incrementError) {
+            console.error("Upload success, Deducted points, BUT failed to increment senderCount:", incrementError);
+            setError("อัปโหลดสำเร็จและหักแต้มแล้ว แต่เกิดปัญหาในการนับจำนวน กรุณาติดต่อแอดมินด่วน!");
+            setLoading(false);
+            return;
+          }
+
           setSuccessMessage(result.message ?? "อัปโหลดสำเร็จแล้วค้าบ! (หักแต้มเรียบร้อย)");
           setShowSuccessModal(true);
           setTitle("");
@@ -147,7 +204,6 @@ export default function Contact() {
     <main className="min-h-screen flex flex-col items-center p-4 md:justify-center md:p-6 gap-6">
       <BottomNav />
 
-      {/* loading overlay */}
       {loading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="flex flex-col items-center gap-3">
@@ -163,16 +219,12 @@ export default function Contact() {
         </div>
       )}
 
-      {/* Status card - อยู่บนสุด, ปรับให้เหมาะกับมือถือ */}
       <div className="card bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg p-6 w-full max-w-md text-center">
 
         <h1 className="text-xl md:text-2xl font-bold mb-3">
           สถานะการส่งวาร์ป
         </h1>
 
-        {/* ------------------------ */}
-
-        {/* Tabs (mobile-friendly, centered large count) */}
         <div className="w-full">
           <div className="flex justify-center gap-2 mb-4">
             <button
@@ -189,17 +241,9 @@ export default function Contact() {
             >
               ตาราง
             </button>
-            {/* <button
-              type="button"
-              onClick={() => setActiveTab("rules")}
-              className={`tab rounded-full px-4 py-1 text-sm md:text-base ${activeTab === "rules" ? "tab-active" : ""}`}
-            >
-              กติกา
-            </button> */}
           </div>
 
           <div className="bg-base-100 border-base-300 p-4 rounded-lg">
-            {/* Status panel */}
             {activeTab === "status" && (
               <div className="flex flex-col items-center justify-center">
                 <div
@@ -210,7 +254,6 @@ export default function Contact() {
                 </div>
                 <div className="text-sm text-gray-500 mt-1">/ {MAX} คน</div>
 
-                {/* Progress bar */}
                 <div className="w-full mt-4 px-2">
                   <div className="w-full h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div
@@ -230,7 +273,6 @@ export default function Contact() {
               </div>
             )}
 
-            {/* Schedule panel */}
             {activeTab === "schedule" && (
               <div className="space-y-3">
                 {schedule.map((s) => (
@@ -251,7 +293,6 @@ export default function Contact() {
               </div>
             )}
 
-            {/* Rules / info panel */}
             {activeTab === "rules" && (
               <div className="text-sm text-gray-600">
                 <p className="mb-2">กติกาสั้น ๆ :</p>
@@ -265,11 +306,8 @@ export default function Contact() {
           </div>
         </div>
 
-        {/* -------------- */}
-
       </div>
 
-      {/* Form card - อยู่ด้านล่าง */}
       <form
         onSubmit={handleSubmit}
         className="card bg-white/80 dark:bg-gray-900/80 p-6 md:p-8 rounded-2xl shadow-lg border border-gray-200 max-w-sm w-full text-center backdrop-blur-md"
@@ -337,7 +375,6 @@ export default function Contact() {
         {error && <p className="text-red-500 mt-4">{error}</p>}
       </form>
 
-      {/* success modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="max-w-md w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-white/10">
@@ -358,7 +395,6 @@ export default function Contact() {
         </div>
       )}
 
-      {/* Rules card */}
       <div className="card bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg p-6 w-full max-w-md mb-24">
         <div className="flex items-center gap-3 mb-6">
           <i className="ri-error-warning-line text-2xl text-red-500"></i>

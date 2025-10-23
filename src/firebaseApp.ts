@@ -101,7 +101,6 @@ export async function loginWithGoogle(): Promise<User | null> {
 // ----------------------------------------------
 // ฟังก์ชัน Helper (ใช้ร่วมกัน)
 // ----------------------------------------------
-
 async function createUserDocument(user: User, role: string): Promise<void> {
     const userRef = doc(db, "users", user.uid);
     const newUser = {
