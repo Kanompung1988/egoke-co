@@ -340,7 +340,7 @@ export default function Contact() {
                             </div>
 
                             {/* Tab Panels */}
-                            <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 p-4 rounded-lg min-h-[300px]"> {/* Removed relative */}
+                            <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 p-4 rounded-lg min-h-[200px]"> {/* Removed relative */}
 
                                 {/* Status Panel Content */}
                                 {activeTab === "status" && (
@@ -356,7 +356,7 @@ export default function Contact() {
                                             {currentCount >= MAX ? (
                                                 <p className="text-red-500 text-sm">❌ รอบนี้เต็มแล้ว! รอรอบถัดไปได้เลย</p>
                                             ) : (
-                                                <p className="text-green-600 text-sm">✅ ยังสามารถส่งได้อีก {MAX - currentCount} คน</p>
+                                                <p className="text-green-600 text-sm mt-1.5">✅ ยังสามารถส่งได้อีก {MAX - currentCount} คน</p>
                                             )}
                                         </div>
                                     </div>
