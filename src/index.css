@@ -713,3 +713,410 @@
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
 }
+
+/* ===============================
+   Custom Animations for EG'OKE
+   =============================== */
+
+/* Fade in animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Pulse slow animation for logo */
+@keyframes pulseSlow {
+    0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 20px rgba(230, 57, 70, 0.3));
+    }
+    50% {
+        transform: scale(1.05);
+        filter: drop-shadow(0 0 30px rgba(230, 57, 70, 0.5));
+    }
+}
+
+.animate-pulse-slow {
+    animation: pulseSlow 3s ease-in-out infinite;
+}
+
+/* Floating lantern animations */
+@keyframes floatLantern {
+    0%, 100% {
+        transform: translateY(0) rotate(-5deg);
+    }
+    50% {
+        transform: translateY(-30px) rotate(5deg);
+    }
+}
+
+.lantern {
+    position: absolute;
+    font-size: 3rem;
+    opacity: 0.6;
+    animation: floatLantern 6s ease-in-out infinite;
+    filter: drop-shadow(0 0 10px rgba(255, 183, 3, 0.5));
+}
+
+.lantern-1 {
+    top: 10%;
+    left: 10%;
+    animation-delay: 0s;
+}
+
+.lantern-2 {
+    top: 15%;
+    right: 15%;
+    animation-delay: 2s;
+}
+
+.lantern-3 {
+    bottom: 20%;
+    left: 20%;
+    animation-delay: 4s;
+}
+
+/* Gradient text for titles */
+.text-gradient-red {
+    background: linear-gradient(135deg, #E63946 0%, #FFB703 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Card hover effect */
+.card-hover {
+    transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Shimmer effect */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.shimmer {
+    background: linear-gradient(
+        90deg,
+        rgba(255,255,255,0) 0%,
+        rgba(255,255,255,0.2) 50%,
+        rgba(255,255,255,0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+}
+
+/* Page transition */
+.page-enter {
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.page-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: all 0.4s ease-out;
+}
+
+/* Japanese pattern overlay */
+.pattern-overlay {
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23E63946' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Bounce animation for icons */
+@keyframes bounce-soft {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-6px);
+    }
+}
+
+.animate-bounce-soft {
+    animation: bounce-soft 2s ease-in-out infinite;
+}
+
+/* Glow effect for buttons */
+.btn-glow {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-glow::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 300%;
+    height: 300%;
+    background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.5s ease;
+}
+
+.btn-glow:hover::after {
+    transform: translate(-50%, -50%) scale(1);
+}
+
+/* Prize card styling */
+.prize-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: all 0.3s ease;
+}
+
+.prize-card:hover {
+    transform: scale(1.05);
+    border-color: rgba(255,183,3,0.5);
+    box-shadow: 0 8px 32px rgba(255,183,3,0.2);
+}
+
+/* Glass effect */
+.glass {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Torii gate decoration */
+.torii-decoration {
+    position: relative;
+}
+
+.torii-decoration::before {
+    content: '⛩️';
+    position: absolute;
+    top: -1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.5rem;
+}
+
+/* ===============================
+   FIREWORKS ANIMATION
+   =============================== */
+.fireworks-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+}
+
+/* Firework particle */
+.firework {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    animation: firework-burst 3s ease-out infinite;
+}
+
+/* Firework 1 - Red/Gold */
+.firework-1 {
+    top: 20%;
+    left: 15%;
+    background: #ff4444;
+    box-shadow: 
+        0 0 6px #ff4444,
+        0 0 12px #ff4444,
+        0 0 20px #ffaa00,
+        /* Particles */
+        30px -40px 0 #ff6666,
+        -30px -40px 0 #ffaa00,
+        40px 20px 0 #ff4444,
+        -40px 20px 0 #ff6666,
+        0px -50px 0 #ffaa00,
+        50px 0px 0 #ff4444,
+        -50px 0px 0 #ffaa00,
+        35px 35px 0 #ff6666,
+        -35px 35px 0 #ff4444,
+        20px -45px 0 #ffaa00,
+        -20px -45px 0 #ff6666,
+        45px -20px 0 #ff4444,
+        -45px -20px 0 #ffaa00;
+    animation-delay: 0s;
+}
+
+/* Firework 2 - Gold/Orange */
+.firework-2 {
+    top: 30%;
+    right: 20%;
+    background: #ffdd00;
+    box-shadow: 
+        0 0 6px #ffdd00,
+        0 0 12px #ffaa00,
+        0 0 20px #ff8800,
+        /* Particles */
+        35px -35px 0 #ffdd00,
+        -35px -35px 0 #ff8800,
+        35px 35px 0 #ffaa00,
+        -35px 35px 0 #ffdd00,
+        0px -50px 0 #ff8800,
+        50px 0px 0 #ffdd00,
+        -50px 0px 0 #ffaa00,
+        0px 50px 0 #ff8800,
+        25px -45px 0 #ffdd00,
+        -25px -45px 0 #ffaa00,
+        45px 25px 0 #ff8800,
+        -45px 25px 0 #ffdd00;
+    animation-delay: 1s;
+}
+
+/* Firework 3 - Red/Pink */
+.firework-3 {
+    top: 15%;
+    left: 60%;
+    background: #ff2222;
+    box-shadow: 
+        0 0 6px #ff2222,
+        0 0 12px #ff4466,
+        0 0 20px #ff6688,
+        /* Particles */
+        40px -30px 0 #ff2222,
+        -40px -30px 0 #ff4466,
+        30px 40px 0 #ff6688,
+        -30px 40px 0 #ff2222,
+        0px -55px 0 #ff4466,
+        55px 0px 0 #ff6688,
+        -55px 0px 0 #ff2222,
+        0px 55px 0 #ff4466,
+        38px -38px 0 #ff6688,
+        -38px -38px 0 #ff2222,
+        38px 38px 0 #ff4466,
+        -38px 38px 0 #ff6688;
+    animation-delay: 2s;
+}
+
+@keyframes firework-burst {
+    0% {
+        opacity: 0;
+        transform: scale(0);
+    }
+    10% {
+        opacity: 1;
+        transform: scale(0.5);
+    }
+    30% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.2);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.5);
+    }
+}
+
+/* Sparkle animation */
+@keyframes sparkle {
+    0%, 100% {
+        opacity: 0;
+        transform: scale(0);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.sparkle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: white;
+    border-radius: 50%;
+    animation: sparkle 2s ease-in-out infinite;
+}
+
+/* Multiple sparkles with different positions and delays */
+.sparkle:nth-child(1) { top: 10%; left: 20%; animation-delay: 0s; }
+.sparkle:nth-child(2) { top: 20%; right: 25%; animation-delay: 0.3s; }
+.sparkle:nth-child(3) { top: 35%; left: 10%; animation-delay: 0.6s; }
+.sparkle:nth-child(4) { top: 15%; right: 10%; animation-delay: 0.9s; }
+.sparkle:nth-child(5) { top: 40%; left: 30%; animation-delay: 1.2s; }
+.sparkle:nth-child(6) { top: 25%; right: 35%; animation-delay: 1.5s; }
+
+/* Rising stars animation */
+@keyframes rise-star {
+    0% {
+        opacity: 0;
+        transform: translateY(100px) scale(0);
+    }
+    20% {
+        opacity: 1;
+        transform: translateY(50px) scale(1);
+    }
+    80% {
+        opacity: 1;
+        transform: translateY(-50px) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-100px) scale(0);
+    }
+}
+
+.rising-star {
+    position: absolute;
+    font-size: 1.5rem;
+    animation: rise-star 4s ease-in-out infinite;
+}
+
+.rising-star-1 { bottom: 20%; left: 5%; animation-delay: 0s; }
+.rising-star-2 { bottom: 30%; right: 8%; animation-delay: 1s; }
+.rising-star-3 { bottom: 15%; left: 85%; animation-delay: 2s; }
+.rising-star-4 { bottom: 25%; right: 85%; animation-delay: 3s; }
+
+/* Glowing orbs */
+@keyframes glow-pulse {
+    0%, 100% {
+        opacity: 0.3;
+        transform: scale(1);
+        box-shadow: 0 0 20px rgba(255, 100, 100, 0.5);
+    }
+    50% {
+        opacity: 0.6;
+        transform: scale(1.1);
+        box-shadow: 0 0 40px rgba(255, 100, 100, 0.8);
+    }
+}
+
+.glow-orb {
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,100,100,0.3) 0%, transparent 70%);
+    animation: glow-pulse 4s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.glow-orb-1 { top: 10%; left: 5%; animation-delay: 0s; }
+.glow-orb-2 { top: 60%; right: 5%; animation-delay: 2s; }
+.glow-orb-3 { bottom: 10%; left: 50%; animation-delay: 1s; }

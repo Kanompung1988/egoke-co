@@ -13,6 +13,8 @@
     "@types/busboy": "^1.5.4",
     "auth": "^1.2.3",
     "busboy": "^1.6.0",
+    "chart.js": "^4.5.1",
+    "chartjs-plugin-datalabels": "^2.2.0",
     "firebase": "^12.4.0",
     "html5-qrcode": "^2.3.8",
     "react": "^19.1.1",

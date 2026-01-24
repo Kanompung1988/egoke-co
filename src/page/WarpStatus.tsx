@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import BottomNav from "../components/BottomNav";
 
 export default function WarpStatus() {
     const MAX = 22; // จำกัดจำนวนผู้ส่งต่อรอบ
-    const [currentCount, setCurrentCount] = useState(14); // mock data: คนที่ส่งแล้ว
+    const [currentCount] = useState(14); // mock data: คนที่ส่งแล้ว
 
     // mock schedule (3 วัน x 2 รอบ)
     const schedule = [

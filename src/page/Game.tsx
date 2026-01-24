@@ -13,11 +13,9 @@ import {
     orderBy,
     limit,
     getDocs,
-    Timestamp // Import Timestamp for potential use later, though Date.now() works
 } from "firebase/firestore";
 
 import GameWheel from "../components/GameWheel";
-import PointsCard from "../components/PointsCard";
 import UserSummary from "../components/UserSummary";
 import HistoryList from "../components/HistoryList";
 import PrizeModal from "../components/PrizeModal";
@@ -229,61 +227,118 @@ export default function Game() {
     // --- JSX Rendering ---
     return (
         <>
-            <div className="min-h-screen pb-28" style={{ backgroundImage: "url('/Artwork.png')", backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                <div className="p-6 text-center bg-black/30 backdrop-blur-sm">
-                    <div className="max-w-4xl mx-auto p-6 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md shadow-xl">
-                        {/* Header and Logo */}
-                        <img src="/Logo_eg'oke.jpg" alt="Logo" className="mx-auto w-28 md:w-36 rounded-full shadow-xl mb-4 border-4 border-white/20" />
-                        <h1 className="text-2xl md:text-3xl text-white font-extrabold mb-1">เกมวงล้อสุ่มของรางวัล</h1>
-                        <p className="text-sm md:text-base text-gray-200 mb-4">ใช้แต้มเพื่อหมุน (แต่ละครั้งจะหัก {DEFAULT_SPIN_COST} แต้ม)</p>
+            <div className="min-h-screen pb-28 relative overflow-hidden">
+                {/* Background */}
+                <div 
+                    className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                    style={{ backgroundImage: "url('/art/game-bg.png')" }}
+                />
+                <div className="absolute inset-0 bg-red-900/40" />
+                
+                {/* Fireworks */}
+                <div className="fireworks-container">
+                    <div className="firework firework-1"></div>
+                    <div className="firework firework-2"></div>
+                    <div className="firework firework-3"></div>
+                </div>
+
+                <div className="relative z-10 p-4 md:p-6">
+                    <div className="max-w-6xl mx-auto">
+                        {/* Header */}
+                        <div className="text-center mb-4 animate-fade-in">
+                            <img 
+                                src="/logo.jpg" 
+                                alt="Logo" 
+                                className="mx-auto w-14 md:w-16 rounded-xl shadow-lg mb-2 border-2 border-white/50"
+                                onError={(e) => { (e.target as HTMLImageElement).src = '/art/logo.png'; }}
+                            />
+                            <h1 className="text-2xl md:text-3xl text-white font-bold mb-1 drop-shadow-lg">
+                                🎡 วงล้อมหาสนุก
+                            </h1>
+                            <p className="text-white/90 text-sm">
+                                ใช้ <span className="text-yellow-300 font-bold">{DEFAULT_SPIN_COST}</span> แต้มต่อครั้ง
+                            </p>
+                        </div>
 
                         {/* Login Prompt */}
                         {!user && (
-                            <div className="mb-4 p-4 bg-yellow-500/20 border border-yellow-500/50 rounded-lg">
-                                <p className="text-yellow-200 text-sm">⚠️ กรุณาเข้าสู่ระบบเพื่อเล่นเกมและบันทึกคะแนน</p>
+                            <div className="mb-4 p-3 bg-amber-500/80 border border-amber-400 rounded-xl text-center animate-fade-in">
+                                <p className="text-white text-sm font-medium">⚠️ กรุณาเข้าสู่ระบบเพื่อเล่นเกม</p>
                             </div>
                         )}
 
-                        {/* Main Content Grid */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                            {/* Left Column: Wheel and Points */}
-                            <div className="flex flex-col items-center gap-8">
-                                <GameWheel
-                                    prizes={prizes}
-                                    isSpinning={isSpinning}
-                                    onSpin={handleSpin}
-                                    disabled={isSpinning || !user || (points ?? 0) < DEFAULT_SPIN_COST}
-                                    wheelRef={wheelRef as RefObject<HTMLDivElement>}
-                                />
-                                <PointsCard points={points} />
+                        {/* Main Layout */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            {/* Left: White Box with Wheel + Points + Prizes */}
+                            <div className="lg:col-span-2">
+                                <div className="bg-white rounded-3xl p-6 shadow-2xl">
+                                    {/* Wheel */}
+                                    <div className="flex justify-center mb-4">
+                                        <GameWheel
+                                            prizes={prizes}
+                                            isSpinning={isSpinning}
+                                            onSpin={handleSpin}
+                                            disabled={isSpinning || !user || (points ?? 0) < DEFAULT_SPIN_COST}
+                                            wheelRef={wheelRef as RefObject<HTMLDivElement>}
+                                        />
+                                    </div>
+                                    
+                                    {/* Points Display - Under Wheel */}
+                                    <div className="flex justify-center mb-6">
+                                        <div className="bg-gradient-to-r from-amber-400 to-yellow-500 rounded-2xl px-8 py-3 shadow-lg">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow">
+                                                    <span className="text-2xl">💰</span>
+                                                </div>
+                                                <div className="text-white">
+                                                    <p className="text-xs font-medium opacity-90">คะแนนของคุณ</p>
+                                                    <p className="text-2xl font-black">{points ?? 0} <span className="text-sm font-bold">แต้ม</span></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Divider */}
+                                    <div className="border-t border-gray-200 my-4"></div>
+                                    
+                                    {/* Prize Legend */}
+                                    <div>
+                                        <h3 className="text-gray-800 font-bold text-center mb-3 flex items-center justify-center gap-2">
+                                            <span>🎁</span>
+                                            <span>รายการของรางวัล</span>
+                                            <span>🎁</span>
+                                        </h3>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                            {prizes.map((p, i) => (
+                                                <div 
+                                                    key={i} 
+                                                    className="flex items-center gap-2 p-2 bg-gray-50 rounded-xl border border-gray-100 hover:bg-red-50 hover:border-red-200 transition-colors"
+                                                >
+                                                    <div 
+                                                        className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-xs shadow"
+                                                        style={{ backgroundColor: p.color }}
+                                                    >
+                                                        {i + 1}
+                                                    </div>
+                                                    <div className="flex items-center gap-1 flex-1 min-w-0">
+                                                        <span className="text-lg">{p.emoji}</span>
+                                                        <span className="text-gray-700 font-medium text-xs truncate">{p.label}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* Right Column: User Summary and History */}
-                            <div className="text-left text-white px-2 sm:px-0">
+                            {/* Right: User Info + History */}
+                            <div className="space-y-4">
                                 <UserSummary user={user} points={points} />
                                 <HistoryList
                                     history={history}
                                     onSelect={(item) => { setSelectedTicket(item); setShowTicketModal(true); }}
                                 />
                             </div>
-                        </div>
-
-                        {/* Prize Legend */}
-                        <div className="mt-6 text-center text-white/80 text-xs md:text-sm bg-gradient-to-r from-black/20 via-black/30 to-black/20 p-4 rounded-xl border border-white/10 backdrop-blur-sm">
-                            <div className="font-bold mb-3 flex items-center justify-center gap-2 text-sm md:text-base">
-                                <span className="text-xl">🎁</span>
-                                <span>รางวัลบนวงล้อ</span>
-                                <span className="text-xl">🎁</span>
-                            </div>
-                            <div className="flex flex-wrap justify-center gap-2">
-                                {prizes.map((p, i) => (
-                                    <span key={i} className="inline-flex items-center gap-1.5 bg-gradient-to-br from-white/15 to-white/5 px-3 py-1.5 rounded-full text-xs border border-white/20">
-                                        <span className="text-base">{p.emoji}</span>
-                                        <span className="font-semibold text-white">{p.label}</span>
-                                    </span>
-                                ))}
-                            </div>
-                            <div className="mt-3 text-[0.65rem] text-gray-400">หมุนวงล้อเพื่อลุ้นรับของรางวัลพิเศษ!</div>
                         </div>
                     </div>
                 </div>
