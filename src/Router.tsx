@@ -6,7 +6,8 @@ import Game from "./page/Game"
 import Profile from "./page/Profile"
 import Contact from "./page/Vap-ig"
 import QRScan from "./page/QRScan"
-// import หน้าอื่นๆ เพิ่มได้ เช่น import Profile from "./page/Profile"
+import Admin from "./page/Admin"
+import SuperAdmin from "./page/SuperAdmin"
 
 export default function AppRouter() {
     return (
@@ -19,6 +20,8 @@ export default function AppRouter() {
                 <Route path="/vap-ig" element={<Contact />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/qrscan" element={<QRScan />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/superadmin" element={<SuperAdmin />} />
             </Routes>
         </BrowserRouter>
     )

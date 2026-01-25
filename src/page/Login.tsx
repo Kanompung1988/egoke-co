@@ -96,17 +96,15 @@ export default function Login() {
             </div>
 
             {/* Login Card */}
-            <section className={`relative z-10 bg-white/95 p-6 rounded-2xl shadow-2xl max-w-sm w-[90%] text-center transition-all duration-700 delay-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+            <section className={`relative z-10 bg-white/95 backdrop-blur-sm p-8 rounded-2xl shadow-2xl max-w-sm w-[90%] text-center transition-all duration-700 delay-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
 
                 {showStaffForm ? (
                     // Staff Login Form
                     <div className="space-y-4 animate-fade-in">
                         <div className="text-center mb-4">
-                            <svg className="w-12 h-12 mx-auto text-gray-700" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                                <path d="M16 11l2 2 4-4"/>
-                            </svg>
-                            <h2 className="text-lg font-bold text-gray-800 mt-2">Staff Login</h2>
+                            <div className="text-5xl mb-3">🔒</div>
+                            <h2 className="text-xl font-bold text-gray-800">Staff Login</h2>
+                            <p className="text-sm text-gray-500 mt-1">สำหรับเจ้าหน้าที่เท่านั้น</p>
                         </div>
                         <input
                             type="text"
@@ -118,54 +116,57 @@ export default function Login() {
                         <button
                             onClick={handleStaffLogin}
                             disabled={isLoading}
-                            className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl py-3 font-bold shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                            className="w-full bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-800 hover:to-gray-950 text-white rounded-xl py-3.5 font-bold shadow-lg transition-all active:scale-95 disabled:opacity-50"
                         >
                             {isLoading ? (
                                 <span className="flex items-center justify-center gap-2">
                                     <span className="loading loading-spinner loading-sm" />
-                                    Signing in...
+                                    กำลังเข้าสู่ระบบ...
                                 </span>
                             ) : (
-                                "Login as Staff"
+                                <span>🔐 เข้าสู่ระบบ Staff</span>
                             )}
                         </button>
                         <button
                             onClick={() => setShowStaffForm(false)}
-                            className="text-sm text-gray-500 hover:text-red-500 transition-colors"
+                            className="w-full text-sm text-gray-500 hover:text-red-500 transition-colors py-2"
                         >
                             ← กลับหน้าหลัก
                         </button>
                     </div>
                 ) : (
                     // Main Login Options
-                    <div className="space-y-4 animate-fade-in">
-                        <div className="text-center mb-3">
-                            <svg className="w-12 h-12 mx-auto text-red-600" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                            </svg>
-                            <h2 className="text-lg font-bold text-gray-800 mt-2">ยินดีต้อนรับ</h2>
+                    <div className="space-y-5 animate-fade-in">
+                        <div className="text-center mb-4">
+                            <div className="text-6xl mb-3 animate-float">⛩️</div>
+                            <h2 className="text-xl font-bold text-gray-800 mb-1">ยินดีต้อนรับ</h2>
                             <p className="text-gray-500 text-sm">เข้าสู่ระบบเพื่อเริ่มต้น</p>
                         </div>
                         
                         <button 
                             onClick={handleGoogleLogin} 
                             disabled={isLoading} 
-                            className="w-full bg-white hover:bg-gray-50 text-gray-700 border-2 border-gray-200 rounded-xl py-3 flex items-center justify-center gap-3 shadow-md transition-all active:scale-95 disabled:opacity-50"
+                            className="w-full bg-white hover:bg-gray-50 text-gray-700 border-2 border-gray-200 rounded-xl py-3.5 flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 font-medium"
                         >
                             {isLoading ? (
-                                <span className="loading loading-spinner loading-sm" />
+                                <>
+                                    <span className="loading loading-spinner loading-sm" />
+                                    <span>กำลังเข้าสู่ระบบ...</span>
+                                </>
                             ) : (
-                                <svg aria-label="Google logo" width="20" height="20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                                    <g>
-                                        <path d="m0 0H512V512H0" fill="#fff"></path>
-                                        <path fill="#34a853" d="M153 292c30 82 118 95 171 60h62v48A192 192 0 0190 341"></path>
-                                        <path fill="#4285f4" d="m386 400a140 175 0 0053-179H260v74h102q-7 37-38 57"></path>
-                                        <path fill="#fbbc02" d="m90 341a208 200 0 010-171l63 49q-12 37 0 73"></path>
-                                        <path fill="#ea4335" d="m153 219c22-69 116-109 179-50l55-54c-78-75-230-72-297 55"></path>
-                                    </g>
-                                </svg>
+                                <>
+                                    <svg aria-label="Google logo" width="20" height="20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                                        <g>
+                                            <path d="m0 0H512V512H0" fill="#fff"></path>
+                                            <path fill="#34a853" d="M153 292c30 82 118 95 171 60h62v48A192 192 0 0190 341"></path>
+                                            <path fill="#4285f4" d="m386 400a140 175 0 0053-179H260v74h102q-7 37-38 57"></path>
+                                            <path fill="#fbbc02" d="m90 341a208 200 0 010-171l63 49q-12 37 0 73"></path>
+                                            <path fill="#ea4335" d="m153 219c22-69 116-109 179-50l55-54c-78-75-230-72-297 55"></path>
+                                        </g>
+                                    </svg>
+                                    <span>Continue with Google</span>
+                                </>
                             )}
-                            {isLoading ? "Signing in..." : "Continue with Google"}
                         </button>
 
                         <div className="relative">
@@ -179,13 +180,10 @@ export default function Login() {
 
                         <button
                             onClick={() => setShowStaffForm(true)}
-                            className="w-full bg-gray-800 hover:bg-gray-900 text-white rounded-xl py-3 font-medium shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+                            className="w-full bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-800 hover:to-gray-950 text-white rounded-xl py-3.5 font-medium shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                                <path d="M16 11l2 2 4-4"/>
-                            </svg>
-                            Staff Login
+                            <span className="text-lg">🔒</span>
+                            <span>Staff Login</span>
                         </button>
                     </div>
                 )}
