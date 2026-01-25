@@ -25,10 +25,23 @@ export default function Login() {
     }, [navigate]);
 
     const handleGoogleLogin = async () => {
+        console.log('🔵 Starting Google login...');
         setIsLoading(true);
-        const user = await loginWithGoogle();
-        if (user) {
-            navigate("/Home", { state: { justLoggedIn: true } });
+        try {
+            const user = await loginWithGoogle();
+            console.log('Login result:', user ? '✅ Success' : '❌ Failed');
+            if (user) {
+                console.log('🚀 Navigating to /Home');
+                // รอให้ AuthContext อัปเดต state ก่อน navigate
+                setTimeout(() => {
+                    navigate("/Home", { state: { justLoggedIn: true }, replace: true });
+                }, 500);
+            } else {
+                window.alert('เข้าสู่ระบบไม่สำเร็จ กรุณาลองอีกครั้ง');
+            }
+        } catch (error) {
+            console.error('❌ Login error in component:', error);
+            window.alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
         }
         setIsLoading(false);
     };

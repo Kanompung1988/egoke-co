@@ -79,21 +79,31 @@ export async function loginAsStaff(staffCode: string): Promise<{ user: User | nu
 // ----------------------------------------------
 export async function loginWithGoogle(): Promise<User | null> {
     try {
+        console.log('🔓 Opening Google popup...');
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
-        console.log("✅ Normal user logged in:", user.displayName);
+        console.log("✅ Google auth success:", user.email);
 
         const userRef = doc(db, "users", user.uid);
         const snapshot = await getDoc(userRef);
 
         // ถ้าเป็น user ใหม่ ให้สร้างเอกสารด้วย role "none" เสมอ
         if (!snapshot.exists()) {
+            console.log('📝 Creating new user document...');
             await createUserDocument(user, "none");
+            console.log('✅ User document created');
+        } else {
+            console.log('👤 Existing user, document already exists');
         }
 
         return user;
-    } catch (error) {
-        console.error("❌ Login error:", error);
+    } catch (error: any) {
+        console.error("❌ Login error:", error.code, error.message);
+        if (error.code === 'auth/popup-closed-by-user') {
+            console.log('User closed the popup');
+        } else if (error.code === 'auth/unauthorized-domain') {
+            console.error('⚠️  Domain not authorized in Firebase Console!');
+        }
         return null;
     }
 }

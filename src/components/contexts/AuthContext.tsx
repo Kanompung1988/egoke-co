@@ -33,12 +33,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let unsubscribeFromFirestore: () => void;
 
         const unsubscribeFromAuth = onAuthStateChanged(auth, (user: FirebaseUser | null) => {
+            console.log('🔐 Auth state changed:', user?.email || 'No user');
+            
             // ถ้ามีการเปลี่ยน user (login/logout) ให้ยกเลิกการฟังข้อมูลเก่าก่อน
             if (unsubscribeFromFirestore) {
                 unsubscribeFromFirestore();
             }
 
             if (user) {
+                console.log('👤 User logged in, fetching Firestore data...');
                 // เมื่อมี user ล็อกอิน, ให้เริ่ม "คอยฟัง" การเปลี่ยนแปลงที่เอกสารของ user คนนั้น
                 const userDocRef = doc(db, 'users', user.uid);
                 
@@ -46,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     if (docSnap.exists()) {
                         // ทันทีที่เอกสารถูกสร้างหรืออัปเดต, เราจะได้ข้อมูลใหม่ที่นี่
                         const userData = docSnap.data();
+                        console.log('✅ Firestore data loaded:', { role: userData.role, points: userData.points });
                         setCurrentUser({
                             uid: user.uid,
                             email: user.email,
@@ -55,11 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             points: userData.points || 0,
                         });
                     } else {
+                        console.log('⚠️  User document does not exist yet, waiting...');
                         // กรณีที่ user ล็อกอินแล้ว แต่เอกสารยังไม่ถูกสร้าง (จะเกิดขึ้นแค่แวบเดียว)
                         // ไม่ต้องทำอะไร รอให้ login function สร้างเอกสาร แล้ว onSnapshot จะทำงานอีกครั้งเอง
                     }
                 });
             } else {
+                console.log('👋 User logged out');
                 // ถ้า user logout
                 setCurrentUser(null);
             }
@@ -80,9 +86,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
     };
 
+    console.log('AuthContext state:', { currentUser: currentUser?.uid, loading });
+
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 }
