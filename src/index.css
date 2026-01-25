@@ -164,6 +164,19 @@
     animation: bounce-gentle 2s ease-in-out infinite;
 }
 
+@keyframes bounce-soft {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+.animate-bounce-soft {
+    animation: bounce-soft 1.5s ease-in-out infinite;
+}
+
 .fan-icon {
     background-color: #ea2a33;
     border-radius: 50%;

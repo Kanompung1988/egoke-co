@@ -192,15 +192,9 @@ export default function Home() {
 
                         <div className="p-5 text-center">
                             <div className="flex justify-center gap-3 mb-3">
-                                <svg className="w-8 h-8 text-red-600 animate-bounce-soft" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                                </svg>
-                                <svg className="w-8 h-8 text-amber-600 animate-bounce-soft" style={{ animationDelay: '0.1s' }} fill="currentColor" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="12" r="10"/>
-                                </svg>
-                                <svg className="w-8 h-8 text-purple-600 animate-bounce-soft" style={{ animationDelay: '0.2s' }} fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                </svg>
+                                <span className="text-2xl animate-bounce-soft">🎌</span>
+                                <span className="text-2xl animate-bounce-soft" style={{ animationDelay: '0.1s' }}>⛩️</span>
+                                <span className="text-2xl animate-bounce-soft" style={{ animationDelay: '0.2s' }}>🏮</span>
                             </div>
                             <h2 className="text-lg font-bold text-gray-900 mb-2">ยินดีต้อนรับ!</h2>
                             <p className="text-gray-600 text-sm mb-4">ขอบคุณที่เข้าร่วมงาน EG'OKE 2025<br/>มาสนุกกับกิจกรรมมากมายกันเถอะ!</p>
