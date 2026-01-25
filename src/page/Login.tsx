@@ -26,6 +26,7 @@ export default function Login() {
 
     const handleGoogleLogin = async () => {
         console.log('🔵 Starting Google login...');
+        console.log('Current domain:', window.location.hostname);
         setIsLoading(true);
         try {
             const user = await loginWithGoogle();
@@ -37,11 +38,12 @@ export default function Login() {
                     navigate("/Home", { state: { justLoggedIn: true }, replace: true });
                 }, 500);
             } else {
-                window.alert('เข้าสู่ระบบไม่สำเร็จ กรุณาลองอีกครั้ง');
+                console.error('❌ Login returned null - check Console for details');
+                window.alert('เข้าสู่ระบบไม่สำเร็จ\n\nกรุณา:\n1. เปิด Console (F12)\n2. ดู error message\n3. เช็คว่า domain ถูก authorize ใน Firebase');
             }
         } catch (error) {
             console.error('❌ Login error in component:', error);
-            window.alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
+            window.alert('เกิดข้อผิดพลาด:\n' + (error as Error).message + '\n\nเปิด Console (F12) เพื่อดูรายละเอียด');
         }
         setIsLoading(false);
     };
@@ -100,8 +102,11 @@ export default function Login() {
                     // Staff Login Form
                     <div className="space-y-4 animate-fade-in">
                         <div className="text-center mb-4">
-                            <span className="text-3xl">👨‍💼</span>
-                            <h2 className="text-lg font-bold text-gray-800 mt-1">Staff Login</h2>
+                            <svg className="w-12 h-12 mx-auto text-gray-700" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                <path d="M16 11l2 2 4-4"/>
+                            </svg>
+                            <h2 className="text-lg font-bold text-gray-800 mt-2">Staff Login</h2>
                         </div>
                         <input
                             type="text"
@@ -135,8 +140,10 @@ export default function Login() {
                     // Main Login Options
                     <div className="space-y-4 animate-fade-in">
                         <div className="text-center mb-3">
-                            <span className="text-3xl">⛩️</span>
-                            <h2 className="text-lg font-bold text-gray-800 mt-1">ยินดีต้อนรับ</h2>
+                            <svg className="w-12 h-12 mx-auto text-red-600" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                            </svg>
+                            <h2 className="text-lg font-bold text-gray-800 mt-2">ยินดีต้อนรับ</h2>
                             <p className="text-gray-500 text-sm">เข้าสู่ระบบเพื่อเริ่มต้น</p>
                         </div>
                         
@@ -172,9 +179,13 @@ export default function Login() {
 
                         <button
                             onClick={() => setShowStaffForm(true)}
-                            className="w-full bg-gray-800 hover:bg-gray-900 text-white rounded-xl py-3 font-medium shadow-md transition-all active:scale-95"
+                            className="w-full bg-gray-800 hover:bg-gray-900 text-white rounded-xl py-3 font-medium shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
                         >
-                            👨‍💼 Staff Login
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                <path d="M16 11l2 2 4-4"/>
+                            </svg>
+                            Staff Login
                         </button>
                     </div>
                 )}

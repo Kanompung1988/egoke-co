@@ -103,6 +103,10 @@
     scroll-behavior: smooth;
 }
 
+.text-shadow {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
 .fan-icon {
     background-color: #ea2a33;
     border-radius: 50%;
