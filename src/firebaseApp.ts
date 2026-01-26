@@ -4,7 +4,8 @@ import {
     getAuth,
     onAuthStateChanged,
     GoogleAuthProvider,
-    signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
     signOut,
     type Unsubscribe,
     type User
@@ -40,37 +41,33 @@ const provider = new GoogleAuthProvider();
 // -------------------------------------
 // ฟังก์ชันสำหรับ Staff Login โดยเฉพาะ
 // -------------------------------------
-export async function loginAsStaff(staffCode: string): Promise<{ user: User | null; error: string | null }> {
+export async function loginAsStaff(staffCode: string): Promise<{ success: boolean; error: string | null }> {
     if (!staffCode) {
-        return { user: null, error: "กรุณากรอก Staff Code" };
+        return { success: false, error: "กรุณากรอก Staff Code" };
     }
 
     // 1. ตรวจสอบ Staff Code ก่อน
     const role = await validateStaffCode(staffCode);
     if (!role) {
-        return { user: null, error: "Staff Code ไม่ถูกต้อง" };
+        return { success: false, error: "Staff Code ไม่ถูกต้อง" };
     }
 
-    // 2. ถ้าโค้ดถูกต้อง ให้เริ่ม Login ด้วย Google
+    // 2. ถ้าโค้ดถูกต้อง ให้เก็บ role ไว้ใน localStorage และเริ่ม redirect
     try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        console.log(`✅ Staff logged in: ${user.displayName} with role: ${role}`);
-
-        const userRef = doc(db, "users", user.uid);
-        const snapshot = await getDoc(userRef);
-
-        // ถ้ายังไม่มี user นี้ ให้สร้างใหม่พร้อม role ที่ได้มา
-        if (!snapshot.exists()) {
-            await createUserDocument(user, role);
-        }
-
-        return { user, error: null };
+        console.log(`✅ Valid staff code. Role: ${role}`);
+        // เก็บ role ไว้ใน localStorage เพื่อใช้หลัง redirect กลับมา
+        localStorage.setItem('pendingStaffRole', role);
+        
+        // ทำการ redirect ไป Google login
+        await signInWithRedirect(auth, provider);
+        
+        return { success: true, error: null };
 
     } catch (error) {
         console.error("❌ Staff login error:", error);
+        localStorage.removeItem('pendingStaffRole');
         const errorMessage = (error as Error).message || "เกิดข้อผิดพลาดระหว่างการล็อกอิน";
-        return { user: null, error: errorMessage };
+        return { success: false, error: errorMessage };
     }
 }
 
@@ -79,24 +76,11 @@ export async function loginAsStaff(staffCode: string): Promise<{ user: User | nu
 // ----------------------------------------------
 export async function loginWithGoogle(): Promise<User | null> {
     try {
-        console.log('🔓 Opening Google popup...');
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        console.log("✅ Google auth success:", user.email);
-
-        const userRef = doc(db, "users", user.uid);
-        const snapshot = await getDoc(userRef);
-
-        // ถ้าเป็น user ใหม่ ให้สร้างเอกสารด้วย role "none" เสมอ
-        if (!snapshot.exists()) {
-            console.log('📝 Creating new user document...');
-            await createUserDocument(user, "none");
-            console.log('✅ User document created');
-        } else {
-            console.log('👤 Existing user, document already exists');
-        }
-
-        return user;
+        console.log('🔓 Starting Google login with redirect...');
+        // ใช้ redirect แทน popup เพื่อหลีกเลี่ยงปัญหา popup blocker
+        await signInWithRedirect(auth, provider);
+        // หลังจาก redirect กลับมา จะจัดการต่อที่ handleRedirectResult
+        return null; // จะได้ผลลัพธ์จาก redirect ในภายหลัง
     } catch (error: any) {
         console.error("❌ Login error:", error.code, error.message);
         if (error.code === 'auth/popup-closed-by-user') {
@@ -104,6 +88,57 @@ export async function loginWithGoogle(): Promise<User | null> {
         } else if (error.code === 'auth/unauthorized-domain') {
             console.error('⚠️  Domain not authorized in Firebase Console!');
         }
+        return null;
+    }
+}
+
+// ฟังก์ชันจัดการผลลัพธ์หลังจาก redirect กลับมา
+export async function handleRedirectResult(): Promise<User | null> {
+    try {
+        console.log('🔍 Checking for redirect result...');
+        const result = await getRedirectResult(auth);
+        
+        if (result) {
+            const user = result.user;
+            console.log("✅ Google auth success:", user.email);
+
+            const userRef = doc(db, "users", user.uid);
+            const snapshot = await getDoc(userRef);
+
+            // เช็คว่าเป็น staff login หรือไม่
+            const pendingStaffRole = localStorage.getItem('pendingStaffRole');
+            
+            if (pendingStaffRole) {
+                // เป็น Staff Login
+                console.log(`👮 Staff login with role: ${pendingStaffRole}`);
+                localStorage.removeItem('pendingStaffRole');
+                
+                if (!snapshot.exists()) {
+                    console.log('📝 Creating new staff user document...');
+                    await createUserDocument(user, pendingStaffRole);
+                    console.log('✅ Staff user document created');
+                } else {
+                    console.log('👮 Existing staff user');
+                }
+            } else {
+                // เป็น User Login ทั่วไป
+                if (!snapshot.exists()) {
+                    console.log('📝 Creating new user document...');
+                    await createUserDocument(user, "none");
+                    console.log('✅ User document created');
+                } else {
+                    console.log('👤 Existing user, document already exists');
+                }
+            }
+
+            return user;
+        }
+        
+        console.log('ℹ️  No redirect result found');
+        return null;
+    } catch (error: any) {
+        console.error("❌ Redirect result error:", error.code, error.message);
+        localStorage.removeItem('pendingStaffRole'); // ล้างข้อมูลถ้าเกิด error
         return null;
     }
 }

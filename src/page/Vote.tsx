@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useVoteSettings, useCandidates, useUserVoteStatus, submitVote, useVoteStats } from '../hooks/useVote';
 import { useAuth } from '../hooks/useAuth';
-import VoteCard from '../components/VoteCard';
 import VoteStats from '../components/VoteStats';
 import BottomNav from "../components/BottomNav";
 import type { Candidate } from '../hooks/useVote';
@@ -20,6 +19,7 @@ export default function Vote() {
     const [votingInProgress, setVotingInProgress] = useState(false);
     const [showVoteSuccess, setShowVoteSuccess] = useState(false);
     const [votedCandidate, setVotedCandidate] = useState<Candidate | null>(null);
+    const [notificationEnabled, setNotificationEnabled] = useState(false);
 
     const { categories: voteSettings, loading: settingsLoading } = useVoteSettings();
     const { candidates, loading: candidatesLoading } = useCandidates(selectedCategory);
@@ -29,6 +29,40 @@ export default function Vote() {
     const { totalVotes } = useVoteStats(selectedCategory);
 
     const isStaff = currentUser?.role === 'staff';
+
+    // Request notification permission
+    const requestNotificationPermission = async () => {
+        if (!('Notification' in window)) {
+            alert('เบราว์เซอร์ของคุณไม่รองรับการแจ้งเตือน');
+            return;
+        }
+
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                setNotificationEnabled(true);
+                new Notification('🔔 เปิดการแจ้งเตือนแล้ว!', {
+                    body: 'คุณจะได้รับการแจ้งเตือนเมื่อเปิดให้โหวต',
+                    icon: '/logo.jpg',
+                });
+                
+                // Store in localStorage
+                localStorage.setItem('voteNotificationEnabled', 'true');
+            }
+        } catch (error) {
+            console.error('Failed to request notification:', error);
+        }
+    };
+
+    // Check notification permission on mount
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            setNotificationEnabled(
+                Notification.permission === 'granted' && 
+                localStorage.getItem('voteNotificationEnabled') === 'true'
+            );
+        }
+    }, []);
 
     // Auto-select first open category
     useEffect(() => {
@@ -83,37 +117,73 @@ export default function Vote() {
     if (showVoteSuccess && votedCandidate) {
         return (
             <div className="min-h-screen relative overflow-hidden pb-24">
-                {/* Background */}
+                {/* Background with animated gradient */}
                 <div 
                     className="absolute inset-0 bg-cover bg-center bg-no-repeat"
                     style={{ backgroundImage: "url('/art/temple-bg.png')" }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-br from-red-900/60 to-amber-900/60" />
+                <div className="absolute inset-0 bg-gradient-to-br from-red-900/70 via-amber-900/60 to-red-900/70 animate-pulse" 
+                     style={{ animationDuration: '3s' }} 
+                />
                 
-                {/* Confetti Animation */}
+                {/* Floating particles */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    {[...Array(20)].map((_, i) => (
+                        <div
+                            key={i}
+                            className="absolute animate-float"
+                            style={{
+                                left: `${Math.random() * 100}%`,
+                                top: `${Math.random() * 100}%`,
+                                animationDelay: `${Math.random() * 3}s`,
+                                animationDuration: `${3 + Math.random() * 4}s`
+                            }}
+                        >
+                            <span className="text-2xl opacity-30">
+                                {['🎉', '✨', '⭐', '🎊', '💫'][Math.floor(Math.random() * 5)]}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+                
+                {/* Fireworks */}
                 <div className="fireworks-container">
                     <div className="firework firework-1"></div>
                     <div className="firework firework-2"></div>
                     <div className="firework firework-3"></div>
                 </div>
 
-                <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
-                    <div className="max-w-md w-full text-center animate-fade-in-down">
-                        {/* Success Icon */}
-                        <div className="mb-6 animate-bounce-soft">
-                            <div className="text-9xl mb-4">🎉</div>
-                            <h1 className="text-4xl font-bold text-white drop-shadow-lg mb-2">
+                <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+                    <div className="max-w-lg w-full">
+                        {/* Success Animation */}
+                        <div className="text-center mb-8 animate-fade-in-down">
+                            <div className="relative inline-block mb-4">
+                                <div className="text-9xl animate-bounce-soft">🎉</div>
+                                <div className="absolute -top-4 -right-4 text-6xl animate-spin-slow">✨</div>
+                                <div className="absolute -bottom-4 -left-4 text-6xl animate-spin-slow" style={{ animationDelay: '0.5s' }}>⭐</div>
+                            </div>
+                            <h1 className="text-5xl font-bold text-white drop-shadow-2xl mb-3 animate-fade-in">
                                 โหวตสำเร็จ!
                             </h1>
-                            <p className="text-white/90 text-lg">ขอบคุณที่ร่วมโหวต</p>
+                            <div className="flex items-center justify-center gap-2 mb-2">
+                                <div className="h-1 w-12 bg-amber-400 rounded-full"></div>
+                                <span className="text-amber-400 text-2xl">✦</span>
+                                <div className="h-1 w-12 bg-amber-400 rounded-full"></div>
+                            </div>
+                            <p className="text-white/90 text-xl">ขอบคุณที่ร่วมโหวต</p>
                         </div>
 
-                        {/* Voted Candidate Card */}
-                        <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 shadow-2xl mb-6">
-                            <p className="text-gray-600 mb-4">คุณได้โหวตให้</p>
+                        {/* Voted Candidate Card - Enhanced */}
+                        <div className="bg-gradient-to-br from-white via-white to-amber-50/50 backdrop-blur-xl rounded-3xl p-8 shadow-2xl mb-6 border-2 border-amber-400/30 animate-fade-in" 
+                             style={{ animationDelay: '0.2s' }}>
+                            <div className="flex items-center justify-center gap-2 mb-6">
+                                <div className="h-0.5 flex-1 bg-gradient-to-r from-transparent via-amber-400 to-amber-400"></div>
+                                <p className="text-amber-600 font-bold text-sm tracking-wider">คุณได้โหวตให้</p>
+                                <div className="h-0.5 flex-1 bg-gradient-to-l from-transparent via-amber-400 to-amber-400"></div>
+                            </div>
                             
-                            <div className="relative mb-4">
-                                <div className="w-40 h-40 mx-auto rounded-2xl overflow-hidden shadow-xl ring-4 ring-amber-400">
+                            <div className="relative mb-6">
+                                <div className="w-48 h-48 mx-auto rounded-3xl overflow-hidden shadow-2xl ring-4 ring-amber-400 ring-offset-4 ring-offset-white/50 transform hover:scale-105 transition-transform duration-300">
                                     {votedCandidate.imageUrl ? (
                                         <img 
                                             src={votedCandidate.imageUrl} 
@@ -124,39 +194,68 @@ export default function Vote() {
                                             }}
                                         />
                                     ) : (
-                                        <div className="w-full h-full bg-gradient-to-br from-red-200 to-amber-200 flex items-center justify-center text-6xl">
+                                        <div className="w-full h-full bg-gradient-to-br from-red-300 via-amber-300 to-yellow-300 flex items-center justify-center text-8xl">
                                             {votedCandidate.category === 'karaoke' && '🎤'}
                                             {votedCandidate.category === 'food' && '🍜'}
                                             {votedCandidate.category === 'cosplay' && '👘'}
                                         </div>
                                     )}
                                 </div>
-                                <div className="absolute -top-2 -right-2 bg-amber-400 text-white p-3 rounded-full shadow-lg animate-pulse">
-                                    ✓
+                                <div className="absolute -top-3 -right-3 bg-gradient-to-br from-amber-400 to-amber-600 text-white p-4 rounded-2xl shadow-2xl animate-pulse">
+                                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
                                 </div>
                             </div>
 
-                            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                                {votedCandidate.name}
-                            </h2>
-                            <p className="text-gray-600 mb-4">
-                                {votedCandidate.description}
-                            </p>
+                            <div className="text-center mb-6">
+                                <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent mb-3">
+                                    {votedCandidate.name}
+                                </h2>
+                                <p className="text-gray-600 text-base leading-relaxed px-4">
+                                    {votedCandidate.description}
+                                </p>
+                            </div>
 
-                            <div className="bg-gradient-to-r from-red-50 to-amber-50 rounded-xl p-4 border border-red-200">
-                                <div className="flex items-center justify-center gap-2 text-red-700">
-                                    <span className="text-3xl font-bold">{votedCandidate.voteCount + 1}</span>
-                                    <span className="text-sm">โหวต</span>
+                            <div className="bg-gradient-to-r from-red-500 via-amber-500 to-red-500 rounded-2xl p-1 shadow-xl">
+                                <div className="bg-white rounded-xl p-4">
+                                    <div className="flex items-center justify-center gap-3">
+                                        <span className="text-5xl font-bold bg-gradient-to-r from-red-600 to-amber-600 bg-clip-text text-transparent">
+                                            {votedCandidate.voteCount + 1}
+                                        </span>
+                                        <div className="text-left">
+                                            <div className="text-sm text-gray-500">คะแนนโหวต</div>
+                                            <div className="text-xs text-amber-600 font-bold">รวมทั้งหมด</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <button
-                            onClick={() => setShowVoteSuccess(false)}
-                            className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-4 rounded-xl font-bold shadow-lg transition-all active:scale-95"
-                        >
-                            ดูผลโหวตทั้งหมด
-                        </button>
+                        <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.4s' }}>
+                            <button
+                                onClick={() => setShowVoteSuccess(false)}
+                                className="w-full bg-gradient-to-r from-red-600 via-red-700 to-amber-600 hover:from-red-700 hover:via-red-800 hover:to-amber-700 text-white py-4 rounded-2xl font-bold shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                                <span>ดูผลโหวตทั้งหมด</span>
+                            </button>
+                            
+                            {isStaff && (
+                                <button
+                                    onClick={() => {
+                                        setShowVoteSuccess(false);
+                                        window.location.href = '/admin';
+                                    }}
+                                    className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white py-3 rounded-2xl font-bold shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                    <span>🛡️</span>
+                                    <span>ไปยัง Admin Dashboard</span>
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -236,14 +335,152 @@ export default function Vote() {
                     </div>
                 )}
 
-                {/* Status Info - Simplified for Users */}
-                {!isOpen && (
-                    <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 text-center shadow-xl mb-4 animate-fade-in">
-                        <div className="text-6xl mb-4">⏳</div>
-                        <h3 className="text-xl font-bold text-gray-800 mb-2">ยังไม่เปิดรับโหวต</h3>
-                        <p className="text-gray-600">
-                            รอการเปิดรับโหวตจากผู้ดูแลระบบ
-                        </p>
+                {/* Status Info - Beautiful Coming Soon Modal */}
+                {!isOpen && !hasVoted && (
+                    <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl mb-4 animate-fade-in overflow-hidden border-2 border-red-100">
+                        {/* Header with gradient */}
+                        <div className="bg-gradient-to-br from-red-50 via-amber-50 to-red-50 px-6 py-8 text-center border-b border-red-100">
+                            <div className="relative inline-block mb-4">
+                                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-red-100 to-amber-100 rounded-3xl flex items-center justify-center shadow-xl">
+                                    <span className="text-5xl">🎊</span>
+                                </div>
+                            </div>
+                            <h3 className="text-3xl font-bold bg-gradient-to-r from-red-700 to-amber-700 bg-clip-text text-transparent mb-2">
+                                เร็วๆ นี้!
+                            </h3>
+                            <p className="text-gray-600 text-sm leading-relaxed">
+                                ระบบโหวตกำลังจะเปิดในภายหลัง นี้<br />
+                                ติดตามกรอคาร์ไลล์ให้มาหลัก
+                            </p>
+                        </div>
+
+                        {/* Categories Preview */}
+                        <div className="px-6 py-6 space-y-3">
+                            {CATEGORIES.map((cat) => {
+                                const settings = voteSettings[cat.id];
+                                const isCategoryOpen = settings?.isOpen || false;
+                                
+                                return (
+                                    <div key={cat.id} className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                                        <div className="text-4xl">{cat.emoji}</div>
+                                        <div className="flex-1">
+                                            <div className="font-bold text-gray-800">{cat.name}</div>
+                                            <div className="text-sm text-gray-500">{cat.description}</div>
+                                        </div>
+                                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                            isCategoryOpen 
+                                                ? 'bg-green-100 text-green-700' 
+                                                : 'bg-gray-100 text-gray-500'
+                                        }`}>
+                                            {isCategoryOpen ? '✓ เปิด' : 'เร็วๆ นี้'}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Notification Button */}
+                        <div className="px-6 pb-6">
+                            <button
+                                onClick={requestNotificationPermission}
+                                disabled={notificationEnabled}
+                                className={`w-full py-4 rounded-2xl font-bold shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                                    notificationEnabled
+                                        ? 'bg-green-500 text-white cursor-default'
+                                        : 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white'
+                                }`}
+                            >
+                                {notificationEnabled ? (
+                                    <>
+                                        <span className="text-2xl">✓</span>
+                                        <span>เปิดการแจ้งเตือนแล้ว</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="text-2xl">🔔</span>
+                                        <span>แจ้งเตือนเมื่อเปิดให้โหวต</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-t border-green-100">
+                            <div className="flex items-center justify-center gap-2 text-green-700">
+                                <span className="text-xl">✓</span>
+                                <div className="text-sm">
+                                    <div className="font-bold">คุณพร้อมโหวตแล้ว!</div>
+                                    <div className="text-xs text-green-600">ติดตามเพิ่มเติม - ระบบพร้อมใช้งาน</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Already Voted - Beautiful Modal */}
+                {!isOpen && hasVoted && (
+                    <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl mb-4 animate-fade-in overflow-hidden border-2 border-amber-100">
+                        {/* Header */}
+                        <div className="bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-50 px-6 py-8 text-center border-b border-amber-100">
+                            <div className="relative inline-block mb-4">
+                                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-amber-100 to-yellow-100 rounded-3xl flex items-center justify-center shadow-xl">
+                                    <span className="text-5xl">🎉</span>
+                                </div>
+                            </div>
+                            <h3 className="text-3xl font-bold bg-gradient-to-r from-amber-700 to-yellow-700 bg-clip-text text-transparent mb-2">
+                                ขอบคุณที่โหวต!
+                            </h3>
+                            <p className="text-gray-600 text-sm">
+                                คุณได้ทำการโหวตเรียบร้อยแล้ว
+                            </p>
+                        </div>
+
+                        {/* Categories Status */}
+                        <div className="px-6 py-6 space-y-3">
+                            {CATEGORIES.map((cat) => {
+                                const settings = voteSettings[cat.id];
+                                const isCategoryOpen = settings?.isOpen || false;
+                                
+                                return (
+                                    <div key={cat.id} className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm">
+                                        <div className="text-4xl">{cat.emoji}</div>
+                                        <div className="flex-1">
+                                            <div className="font-bold text-gray-800">{cat.name}</div>
+                                            <div className="text-sm text-gray-500">{cat.description}</div>
+                                        </div>
+                                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                            isCategoryOpen 
+                                                ? 'bg-green-100 text-green-700' 
+                                                : 'bg-gray-100 text-gray-500'
+                                        }`}>
+                                            {isCategoryOpen ? '✓ เปิด' : 'ปิด'}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Button */}
+                        <div className="px-6 pb-6">
+                            <button
+                                onClick={() => setShowVoteSuccess(true)}
+                                className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 text-white py-4 rounded-2xl font-bold shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                            >
+                                <span className="text-2xl">📊</span>
+                                <span>ดูผลโหวตของคุณ</span>
+                            </button>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-t border-green-100">
+                            <div className="flex items-center justify-center gap-2 text-green-700">
+                                <span className="text-xl">✓</span>
+                                <div className="text-sm">
+                                    <div className="font-bold">คุณโหวตแล้ว!</div>
+                                    <div className="text-xs text-green-600">ขอบคุณมากครับ - ระบบทำงานใช้งาน</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -339,6 +576,7 @@ export default function Vote() {
                         <VoteStats candidates={candidates} totalVotes={totalVotes} />
                     </div>
                 )}
+            </div>
             </div>
 
             {/* Confirmation Modal */}

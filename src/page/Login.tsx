@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { loginWithGoogle, loginAsStaff, watchAuthState, db } from "../firebaseApp";
+import { loginWithGoogle, handleRedirectResult, loginAsStaff, watchAuthState, db } from "../firebaseApp";
 import { doc, getDoc } from "firebase/firestore";
 
 export default function Login() {
@@ -12,6 +12,15 @@ export default function Login() {
 
     useEffect(() => {
         setMounted(true);
+        
+        // ตรวจสอบผลลัพธ์จาก redirect ก่อน
+        handleRedirectResult().then((user) => {
+            if (user) {
+                console.log('✅ Redirect login successful, navigating to home...');
+                navigate("/Home", { state: { justLoggedIn: true }, replace: true });
+            }
+        });
+        
         const unsubscribe = watchAuthState(async (user) => {
             if (user) {
                 const userDocRef = doc(db, "users", user.uid);
@@ -25,27 +34,19 @@ export default function Login() {
     }, [navigate]);
 
     const handleGoogleLogin = async () => {
-        console.log('🔵 Starting Google login...');
+        console.log('🔵 Starting Google login with redirect...');
         console.log('Current domain:', window.location.hostname);
         setIsLoading(true);
         try {
-            const user = await loginWithGoogle();
-            console.log('Login result:', user ? '✅ Success' : '❌ Failed');
-            if (user) {
-                console.log('🚀 Navigating to /Home');
-                // รอให้ AuthContext อัปเดต state ก่อน navigate
-                setTimeout(() => {
-                    navigate("/Home", { state: { justLoggedIn: true }, replace: true });
-                }, 500);
-            } else {
-                console.error('❌ Login returned null - check Console for details');
-                window.alert('เข้าสู่ระบบไม่สำเร็จ\n\nกรุณา:\n1. เปิด Console (F12)\n2. ดู error message\n3. เช็คว่า domain ถูก authorize ใน Firebase');
-            }
+            // loginWithGoogle จะทำการ redirect ออกไป
+            // เมื่อกลับมา useEffect จะจัดการต่อ
+            await loginWithGoogle();
+            console.log('🔄 Redirecting to Google...');
         } catch (error) {
             console.error('❌ Login error in component:', error);
             window.alert('เกิดข้อผิดพลาด:\n' + (error as Error).message + '\n\nเปิด Console (F12) เพื่อดูรายละเอียด');
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     const handleStaffLogin = async () => {
@@ -54,13 +55,14 @@ export default function Login() {
             return;
         }
         setIsLoading(true);
-        const { user, error } = await loginAsStaff(staffCode.trim());
-        if (user) {
-            navigate("/Home", { state: { justLoggedIn: true } });
+        const { success, error } = await loginAsStaff(staffCode.trim());
+        if (success) {
+            console.log('🔄 Redirecting to Google for staff login...');
+            // redirect จะเกิดขึ้นอัตโนมัติ ไม่ต้อง navigate
         } else if (error) {
             window.alert(error);
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     return (
