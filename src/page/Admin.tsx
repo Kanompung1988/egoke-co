@@ -94,6 +94,41 @@ export default function Admin() {
         }
     };
 
+    // Function to sync vote counts from votes collection
+    const syncVoteCounts = async (category: string) => {
+        console.log('🔄 Syncing vote counts for category:', category);
+        
+        try {
+            // Get all candidates in this category
+            const candidatesRef = collection(db, 'candidates');
+            const candidatesQuery = query(candidatesRef, where('category', '==', category));
+            const candidatesSnapshot = await getDocs(candidatesQuery);
+            
+            // Count votes for each candidate
+            const votesRef = collection(db, 'votes');
+            
+            for (const candidateDoc of candidatesSnapshot.docs) {
+                const candidateId = candidateDoc.id;
+                const votesQuery = query(votesRef, where('candidateId', '==', candidateId));
+                const votesSnapshot = await getDocs(votesQuery);
+                const voteCount = votesSnapshot.size;
+                
+                // Update candidate's voteCount
+                await updateDoc(doc(db, 'candidates', candidateId), {
+                    voteCount: voteCount,
+                    lastSyncedAt: Timestamp.now()
+                });
+                
+                console.log(`  ✅ ${candidateDoc.data().name}: ${voteCount} votes`);
+            }
+            
+            console.log('✅ Vote count sync completed');
+        } catch (error) {
+            console.error('❌ Failed to sync vote counts:', error);
+            throw error;
+        }
+    };
+
     const toggleCategory = async (category: string) => {
         const categorySettings = voteSettings[category];
         if (!categorySettings) return;
@@ -113,8 +148,16 @@ export default function Admin() {
                 ...(newIsOpen && { [`categories.${category}.sessionId`]: `session_${Date.now()}` })
             });
             
+            // If closing, sync vote counts automatically
+            if (!newIsOpen) {
+                console.log('📊 Closing vote - syncing vote counts...');
+                await syncVoteCounts(category);
+                alert(`⏸️ ปิดการโหวต ${category} และรวมคะแนนเรียบร้อยแล้ว ✅`);
+            } else {
+                alert(`✅ เปิดการโหวต ${category} แล้ว`);
+            }
+            
             console.log('✅ Toggle success');
-            alert(`${newIsOpen ? '✅ เปิด' : '⏸️ ปิด'}การโหวต ${category} แล้ว`);
         } catch (error) {
             console.error('❌ Failed to toggle category:', error);
             alert('เกิดข้อผิดพลาดในการเปลี่ยนสถานะ: ' + (error as Error).message);
