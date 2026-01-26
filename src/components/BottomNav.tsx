@@ -13,13 +13,14 @@ export default function BottomNav() {
         { path: "/Home", icon: "ri-ancient-pavilion-line", label: "หน้าหลัก", emoji: "⛩️" },
         { path: "/vote", icon: "ri-music-ai-line", label: "โหวต", emoji: "🗳️" },
         // Center button handled separately
+        { path: "/vote-results", icon: "ri-bar-chart-line", label: "ผลโหวต", emoji: "📊" },
         { path: "/vap-ig", icon: "ri-instagram-line", label: "IG", emoji: "📸" },
         { path: "/profile", icon: "ri-user-fill", label: "โปรไฟล์", emoji: "👤" },
     ];
 
     // เพิ่มปุ่ม Admin สำหรับ Admin/Staff/SuperAdmin
     if (isAdminOrStaff) {
-        navItems.splice(3, 0, { path: "/admin", icon: "ri-admin-line", label: "จัดการ", emoji: "🛡️" });
+        navItems.splice(4, 0, { path: "/admin", icon: "ri-admin-line", label: "จัดการ", emoji: "🛡️" });
     }
 
     return (

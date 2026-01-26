@@ -1,0 +1,258 @@
+import { useState, useEffect } from 'react';
+import { useVoteSettings, useCandidates, useVoteStats } from '../hooks/useVote';
+import { useAuth } from '../hooks/useAuth';
+import BottomNav from "../components/BottomNav";
+
+const CATEGORIES = [
+    { id: 'karaoke', name: 'Karaoke Contest', emoji: '🎤', description: 'ประกวดร้องเพลง' },
+    { id: 'food', name: 'Best Food', emoji: '🍜', description: 'อาหารอร่อยที่สุด' },
+    { id: 'cosplay', name: 'Cosplay Contest', emoji: '👘', description: 'คอสเพลย์สวยที่สุด' },
+];
+
+export default function VoteResults() {
+    const { currentUser } = useAuth();
+    const [selectedCategory, setSelectedCategory] = useState<string>('cosplay');
+    const { categories: voteSettings, loading: settingsLoading } = useVoteSettings();
+    const { candidates, loading: candidatesLoading } = useCandidates(selectedCategory);
+    const { totalVotes } = useVoteStats(selectedCategory);
+
+    const categorySettings = voteSettings[selectedCategory];
+    const isOpen = categorySettings?.isOpen || false;
+    const isStaff = ['staff', 'admin', 'superadmin'].includes(currentUser?.role || '');
+
+    // Auto-select first closed category with results
+    useEffect(() => {
+        if (!settingsLoading && Object.keys(voteSettings).length > 0) {
+            const closedWithVotes = Object.entries(voteSettings).find(([_, settings]) => {
+                return !settings.isOpen; // ปิดแล้ว
+            });
+            if (closedWithVotes) {
+                setSelectedCategory(closedWithVotes[0]);
+            }
+        }
+    }, [voteSettings, settingsLoading]);
+
+    // Sort candidates by vote count
+    const sortedCandidates = [...candidates].sort((a, b) => b.voteCount - a.voteCount);
+    const winner = sortedCandidates[0];
+    const maxVotes = winner?.voteCount || 1;
+
+    if (settingsLoading || candidatesLoading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-purple-900 to-indigo-900 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-white border-t-transparent mb-4"></div>
+                    <p className="text-white text-lg">กำลังโหลด...</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen relative overflow-hidden pb-24">
+            {/* Background */}
+            <div 
+                className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                style={{ backgroundImage: "url('/art/temple-bg.png')" }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-red-900/40" />
+
+            <div className="relative z-10 container mx-auto max-w-6xl px-4 pt-6">
+                {/* Header */}
+                <div className="text-center mb-6 animate-fade-in">
+                    <img 
+                        src="/logo.jpg" 
+                        alt="Logo" 
+                        className="w-16 h-16 mx-auto mb-3 rounded-xl shadow-xl border-2 border-white/30"
+                        onError={(e) => { (e.target as HTMLImageElement).src = '/art/logo.png'; }}
+                    />
+                    <h1 className="text-3xl font-bold text-white drop-shadow-lg mb-2">📊 ผลการโหวต</h1>
+                    <p className="text-white/80">ดูผลคะแนนแบบ Real-time</p>
+                </div>
+
+                {/* Category Tabs */}
+                <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-4 shadow-xl mb-6 animate-fade-in">
+                    <div className="grid grid-cols-3 gap-3">
+                        {CATEGORIES.map((cat) => {
+                            const settings = voteSettings[cat.id];
+                            const isSelected = selectedCategory === cat.id;
+                            const isCategoryOpen = settings?.isOpen || false;
+
+                            return (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => setSelectedCategory(cat.id)}
+                                    className={`relative p-4 rounded-xl font-bold transition-all duration-300 ${
+                                        isSelected
+                                            ? 'bg-gradient-to-br from-red-600 to-red-700 text-white shadow-xl scale-105'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    <div className="text-3xl mb-1">{cat.emoji}</div>
+                                    <div className="text-sm">{cat.name}</div>
+                                    
+                                    {/* Status Badge */}
+                                    <div className={`absolute -top-1 -right-1 px-2 py-0.5 rounded-full text-xs font-bold shadow-lg ${
+                                        isCategoryOpen
+                                            ? 'bg-green-500 text-white animate-pulse'
+                                            : 'bg-gray-400 text-white'
+                                    }`}>
+                                        {isCategoryOpen ? 'LIVE' : 'ปิด'}
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Status Notice */}
+                {isOpen && !isStaff && (
+                    <div className="bg-amber-500 text-white rounded-2xl p-4 mb-6 shadow-xl animate-fade-in text-center">
+                        <div className="text-2xl mb-2">⏳</div>
+                        <div className="font-bold">การโหวตยังเปิดอยู่</div>
+                        <div className="text-sm text-amber-100">ผลจะประกาศหลังปิดการโหวต</div>
+                    </div>
+                )}
+
+                {/* Stats Summary */}
+                <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 shadow-xl mb-6 animate-fade-in">
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <div className="text-3xl font-bold text-red-600">{sortedCandidates.length}</div>
+                            <div className="text-sm text-gray-600">ผู้สมัคร</div>
+                        </div>
+                        <div>
+                            <div className="text-3xl font-bold text-purple-600">{totalVotes}</div>
+                            <div className="text-sm text-gray-600">โหวตทั้งหมด</div>
+                        </div>
+                        <div>
+                            <div className="text-3xl">{isOpen ? '🟢' : '🔴'}</div>
+                            <div className="text-sm text-gray-600">{isOpen ? 'เปิดอยู่' : 'ปิดแล้ว'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Winner Card (if closed) */}
+                {!isOpen && winner && (
+                    <div className="bg-gradient-to-br from-amber-400 via-yellow-400 to-amber-500 rounded-3xl p-8 shadow-2xl mb-6 animate-fade-in border-4 border-amber-600">
+                        <div className="text-center mb-4">
+                            <div className="text-6xl mb-3 animate-bounce-soft">🏆</div>
+                            <h2 className="text-3xl font-bold text-white drop-shadow-lg mb-2">ผู้ชนะ</h2>
+                        </div>
+                        
+                        <div className="bg-white rounded-2xl p-6 shadow-xl">
+                            <div className="flex items-center gap-6">
+                                <div className="w-24 h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-amber-200 to-yellow-200 flex-shrink-0 shadow-lg">
+                                    {winner.imageUrl ? (
+                                        <img 
+                                            src={winner.imageUrl} 
+                                            alt={winner.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-5xl">
+                                            {winner.category === 'karaoke' && '🎤'}
+                                            {winner.category === 'food' && '🍜'}
+                                            {winner.category === 'cosplay' && '👘'}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-2xl font-bold text-gray-800 mb-2">{winner.name}</h3>
+                                    <p className="text-gray-600 mb-3">{winner.description}</p>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-4xl font-bold text-red-600">{winner.voteCount}</span>
+                                        <span className="text-gray-500">โหวต</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Results List */}
+                <div className="space-y-4 animate-fade-in">
+                    {sortedCandidates.map((candidate, index) => {
+                        const percentage = totalVotes > 0 ? (candidate.voteCount / totalVotes * 100) : 0;
+                        const barWidth = candidate.voteCount > 0 ? (candidate.voteCount / maxVotes * 100) : 0;
+                        const isWinner = index === 0 && !isOpen;
+
+                        return (
+                            <div 
+                                key={candidate.id}
+                                className={`bg-white/95 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl transition-all duration-300 hover:scale-102 ${
+                                    isWinner ? 'ring-4 ring-amber-400' : ''
+                                }`}
+                            >
+                                <div className="p-6">
+                                    <div className="flex items-center gap-4 mb-4">
+                                        {/* Rank Badge */}
+                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl flex-shrink-0 ${
+                                            index === 0 ? 'bg-gradient-to-br from-amber-400 to-yellow-500 text-white shadow-lg' :
+                                            index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-gray-700' :
+                                            index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700 text-white' :
+                                            'bg-gray-200 text-gray-600'
+                                        }`}>
+                                            {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                                        </div>
+
+                                        {/* Avatar */}
+                                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-red-200 to-amber-200 flex-shrink-0 shadow-lg">
+                                            {candidate.imageUrl ? (
+                                                <img 
+                                                    src={candidate.imageUrl} 
+                                                    alt={candidate.name}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-3xl">
+                                                    {candidate.category === 'karaoke' && '🎤'}
+                                                    {candidate.category === 'food' && '🍜'}
+                                                    {candidate.category === 'cosplay' && '👘'}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-lg text-gray-800 truncate">{candidate.name}</h3>
+                                            <p className="text-sm text-gray-600 truncate">{candidate.description}</p>
+                                        </div>
+
+                                        {/* Votes */}
+                                        <div className="text-right">
+                                            <div className="text-3xl font-bold text-red-600">{candidate.voteCount}</div>
+                                            <div className="text-sm text-gray-500">{percentage.toFixed(1)}%</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Progress Bar */}
+                                    <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
+                                        <div 
+                                            className={`absolute top-0 left-0 h-full transition-all duration-1000 ease-out ${
+                                                index === 0 ? 'bg-gradient-to-r from-amber-400 to-yellow-500' :
+                                                index === 1 ? 'bg-gradient-to-r from-gray-400 to-gray-500' :
+                                                index === 2 ? 'bg-gradient-to-r from-amber-600 to-amber-700' :
+                                                'bg-gradient-to-r from-red-500 to-red-600'
+                                            }`}
+                                            style={{ width: `${barWidth}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+
+                    {sortedCandidates.length === 0 && (
+                        <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-12 text-center shadow-xl">
+                            <div className="text-6xl mb-4">📋</div>
+                            <div className="text-gray-500 text-lg">ยังไม่มีผู้สมัครในหมวดนี้</div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <BottomNav />
+        </div>
+    );
+}

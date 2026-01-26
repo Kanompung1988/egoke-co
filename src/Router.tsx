@@ -8,6 +8,7 @@ import Contact from "./page/Vap-ig"
 import QRScan from "./page/QRScan"
 import Admin from "./page/Admin"
 import SuperAdmin from "./page/SuperAdmin"
+import VoteResults from "./page/VoteResults"
 
 export default function AppRouter() {
     return (
@@ -16,6 +17,7 @@ export default function AppRouter() {
                 <Route path="/" element={<Login />} />
                 <Route path="/Home" element={<Home />} />
                 <Route path="/vote" element={<Vote />} />
+                <Route path="/vote-results" element={<VoteResults />} />
                 <Route path="/game" element={<Game />} />
                 <Route path="/vap-ig" element={<Contact />} />
                 <Route path="/profile" element={<Profile />} />
