@@ -1,0 +1,198 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===================================
+    // Helper Functions - Hierarchical Permissions
+    // SuperAdmin > Admin > Staff > User
+    // ===================================
+    
+    // ตรวจสอบว่าเป็น SuperAdmin (สิทธิ์สูงสุด)
+    function isSuperAdmin() {
+      return request.auth != null 
+        && request.auth.token.email == 'thanaponchanal@gmail.com';
+    }
+    
+    // ตรวจสอบว่าเป็น Admin หรือสูงกว่า (SuperAdmin > Admin)
+    function isAdmin() {
+      return request.auth != null 
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['superadmin', 'admin'];
+    }
+    
+    // ตรวจสอบว่าเป็น Staff หรือสูงกว่า (SuperAdmin > Admin > Staff)
+    function isStaff() {
+      return request.auth != null 
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['superadmin', 'admin', 'staff'];
+    }
+    
+    // Helper function: ตรวจสอบว่าเป็นเจ้าของ document
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Helper function: ตรวจสอบว่า login แล้ว
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // ===================================
+    // Users Collection
+    // ===================================
+    match /users/{userId} {
+      // อ่านได้: 
+      // - ตัวเอง
+      // - Staff ขึ้นไป (staff, admin, superadmin)
+      allow read: if isAuthenticated() && (isOwner(userId) || isStaff());
+      
+      // สร้างได้: เฉพาะตัวเอง (เมื่อ login ครั้งแรก)
+      allow create: if isAuthenticated() && isOwner(userId);
+      
+      // แก้ไขได้:
+      // - ตัวเอง (แต่ห้ามแก้ role, points, tickets)
+      // - Admin ขึ้นไป (admin, superadmin) แก้ได้ทุกอย่าง
+      allow update: if isAuthenticated() && (
+        (isOwner(userId) && 
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'points', 'tickets']))
+        || isAdmin()
+      );
+      
+      // ลบได้: เฉพาะ SuperAdmin
+      allow delete: if isSuperAdmin();
+    }
+
+    // ===================================
+    // Votes Collection (บันทึกการโหวต)
+    // ===================================
+    match /votes/{voteId} {
+      // อ่านได้: 
+      // - ตัวเอง (ดูโหวตของตัวเอง)
+      // - Staff ขึ้นไป (ดูโหวตทั้งหมด)
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid 
+        || isStaff()
+      );
+      
+      // สร้างได้: ทุกคนที่ login (โหวต)
+      allow create: if isAuthenticated() 
+        && request.resource.data.userId == request.auth.uid;
+      
+      // แก้ไข/ลบ: เฉพาะ Admin ขึ้นไป
+      allow update, delete: if isAdmin();
+    }
+
+    // ===================================
+    // Candidates Collection (ผู้สมัคร)
+    // ===================================
+    match /candidates/{candidateId} {
+      // อ่านได้: ทุกคนที่ login แล้ว
+      allow read: if isAuthenticated();
+      
+      // สร้าง/แก้ไข/ลบ: เฉพาะ Staff ขึ้นไป
+      allow create, update, delete: if isStaff();
+    }
+
+    // ===================================
+    // VoteSettings Collection (การตั้งค่าการโหวต)
+    // ===================================
+    match /voteSettings/{settingId} {
+      // อ่านได้: ทุกคนที่ login แล้ว
+      allow read: if isAuthenticated();
+      
+      // แก้ไข: เฉพาะ Staff ขึ้นไป (เปิด/ปิดการโหวต)
+      allow create, update, delete: if isStaff();
+    }
+
+    // ===================================
+    // VoteCategories Collection
+    // ===================================
+    match /voteCategories/{categoryId} {
+      // อ่านได้: ทุกคนที่ login แล้ว
+      allow read: if isAuthenticated();
+      
+      // สร้าง/แก้ไข/ลบ: เฉพาะ Admin ขึ้นไป
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ===================================
+    // UserVotes Collection (การโหวตของผู้ใช้)
+    // ===================================
+    match /userVotes/{voteId} {
+      // อ่านได้: ตัวเอง หรือ Staff ขึ้นไป
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid 
+        || isStaff()
+      );
+      
+      // สร้างได้: ตัวเอง (userId ต้องตรงกับ auth.uid)
+      allow create: if isAuthenticated() 
+        && request.resource.data.userId == request.auth.uid;
+      
+      // แก้ไข/ลบ: เฉพาะ Admin ขึ้นไป
+      allow update, delete: if isAdmin();
+    }
+
+    // ===================================
+    // Prizes Collection (รางวัลจากการหมุนวงล้อ)
+    // ===================================
+    match /prizes/{prizeId} {
+      // อ่านได้: ทุกคนที่ login แล้ว
+      allow read: if isAuthenticated();
+      
+      // สร้าง/แก้ไข/ลบ: เฉพาะ Admin ขึ้นไป
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ===================================
+    // SpinHistory Collection (ประวัติการหมุนวงล้อ)
+    // ===================================
+    match /spinHistory/{historyId} {
+      // อ่านได้: ตัวเอง หรือ Staff ขึ้นไป
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid 
+        || isStaff()
+      );
+      
+      // สร้างได้: ตัวเอง
+      allow create: if isAuthenticated() 
+        && request.resource.data.userId == request.auth.uid;
+      
+      // แก้ไข/ลบ: เฉพาะ Admin ขึ้นไป
+      allow update, delete: if isAdmin();
+    }
+
+    // ===================================
+    // QRScans Collection (ประวัติการสแกน QR)
+    // ===================================
+    match /qrScans/{scanId} {
+      // อ่านได้: Staff ขึ้นไป
+      allow read: if isStaff();
+      
+      // สร้างได้: Staff ขึ้นไป (เมื่อสแกน QR)
+      allow create: if isStaff();
+      
+      // แก้ไข/ลบ: เฉพาะ Admin ขึ้นไป
+      allow update, delete: if isAdmin();
+    }
+
+    // ===================================
+    // Settings Collection (การตั้งค่าระบบ)
+    // ===================================
+    match /settings/{settingId} {
+      // อ่านได้: ทุกคนที่ login แล้ว
+      allow read: if isAuthenticated();
+      
+      // แก้ไข: เฉพาะ Admin ขึ้นไป
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ===================================
+    // Default: Block All (ถ้าไม่ตรงกฎข้างบน)
+    // ===================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

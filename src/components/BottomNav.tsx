@@ -7,7 +7,7 @@ export default function BottomNav() {
     const current = location.pathname;
     const { currentUser } = useAuth();
 
-    const isAdminOrStaff = currentUser?.role.toLowerCase() === 'admin' || currentUser?.role.toLowerCase() === 'staff';
+    const isAdminOrStaff = currentUser?.role === 'admin' || currentUser?.role === 'staff' || currentUser?.role === 'superadmin';
 
     const navItems = [
         { path: "/Home", icon: "ri-ancient-pavilion-line", label: "หน้าหลัก", emoji: "⛩️" },
@@ -16,6 +16,11 @@ export default function BottomNav() {
         { path: "/vap-ig", icon: "ri-instagram-line", label: "IG", emoji: "📸" },
         { path: "/profile", icon: "ri-user-fill", label: "โปรไฟล์", emoji: "👤" },
     ];
+
+    // เพิ่มปุ่ม Admin สำหรับ Admin/Staff/SuperAdmin
+    if (isAdminOrStaff) {
+        navItems.splice(3, 0, { path: "/admin", icon: "ri-admin-line", label: "จัดการ", emoji: "🛡️" });
+    }
 
     return (
         <footer className="fixed bottom-0 left-0 right-0 p-3 z-50">

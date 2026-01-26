@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
-import { db, addPointsToUser } from '../firebaseApp';
+import { db, addPointsToUser, deductPointsFromUser } from '../firebaseApp';
 import BottomNav from '../components/BottomNav';
 import QrScanner from '../components/QrScanner';
 
 interface LastTransaction {
     userName: string;
     pointsAdded: number;
+    isDeduction?: boolean;
 }
 
 interface ScannedUser {
@@ -23,6 +24,7 @@ export default function QRScan() {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isScanning, setIsScanning] = useState<boolean>(true);
     const [lastTransaction, setLastTransaction] = useState<LastTransaction | null>(null);
+    const [mode, setMode] = useState<'add' | 'claim'>('add'); // เพิ่ม mode เลือก
 
     const handleScanSuccess = async (uid: string) => {
         setIsScanning(false);
@@ -56,17 +58,36 @@ export default function QRScan() {
             setError("กรุณากรอกจำนวนแต้มที่ถูกต้อง");
             return;
         }
+        
         setIsLoading(true);
         setError('');
+        
         try {
-            await addPointsToUser(scannedUser.uid, pointsToAdd);
-            setLastTransaction({
-                userName: scannedUser.displayName,
-                pointsAdded: pointsToAdd,
-            });
+            if (mode === 'claim') {
+                // หักแต้มเพื่อเคลมรางวัล
+                if (scannedUser.points < pointsToAdd) {
+                    setError(`❌ แต้มไม่เพียงพอ (มี ${scannedUser.points} แต้ม)`);
+                    setIsLoading(false);
+                    return;
+                }
+                await deductPointsFromUser(scannedUser.uid, pointsToAdd);
+                setLastTransaction({
+                    userName: scannedUser.displayName,
+                    pointsAdded: pointsToAdd,
+                    isDeduction: true,
+                });
+            } else {
+                // เพิ่มแต้ม
+                await addPointsToUser(scannedUser.uid, pointsToAdd);
+                setLastTransaction({
+                    userName: scannedUser.displayName,
+                    pointsAdded: pointsToAdd,
+                    isDeduction: false,
+                });
+            }
             setScannedUser(null);
         } catch (err) {
-            setError("ไม่สามารถเพิ่มแต้มได้ กรุณาตรวจสอบสิทธิ์");
+            setError("ไม่สามารถดำเนินการได้ กรุณาตรวจสอบสิทธิ์");
         } finally {
             setIsLoading(false);
         }
@@ -102,21 +123,53 @@ export default function QRScan() {
                 <div className="text-center mb-6 animate-fade-in">
                     <span className="text-5xl">📱</span>
                     <h1 className="text-3xl font-bold text-white mt-3 drop-shadow-lg">สแกน QR Code</h1>
-                    <p className="text-red-200 text-sm mt-2">สแกนเพื่อเพิ่มแต้มให้ผู้เข้าร่วมงาน</p>
+                    <p className="text-red-200 text-sm mt-2">
+                        {mode === 'add' ? 'สแกนเพื่อเพิ่มแต้มให้ผู้เข้าร่วมงาน' : 'สแกนเพื่อหักแต้มเคลมรางวัล'}
+                    </p>
                 </div>
+
+                {/* Mode Toggle */}
+                {!scannedUser && !lastTransaction && (
+                    <div className="bg-white/95 rounded-2xl p-4 mb-4 shadow-xl animate-fade-in">
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setMode('add')}
+                                className={`flex-1 py-3 rounded-xl font-bold transition-all ${
+                                    mode === 'add'
+                                        ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg'
+                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
+                            >
+                                ➕ เพิ่มแต้ม
+                            </button>
+                            <button
+                                onClick={() => setMode('claim')}
+                                className={`flex-1 py-3 rounded-xl font-bold transition-all ${
+                                    mode === 'claim'
+                                        ? 'bg-gradient-to-r from-orange-600 to-red-700 text-white shadow-lg'
+                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
+                            >
+                                🎁 เคลมรางวัล
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Success State */}
                 {lastTransaction && (
                     <div className="bg-white/95 rounded-3xl p-8 shadow-2xl text-center animate-fade-in">
-                        <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                            <span className="text-4xl text-white">✓</span>
+                        <div className={`w-20 h-20 ${lastTransaction.isDeduction ? 'bg-orange-500' : 'bg-green-500'} rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg`}>
+                            <span className="text-4xl text-white">{lastTransaction.isDeduction ? '🎁' : '✓'}</span>
                         </div>
-                        <h2 className="text-2xl font-bold text-gray-800 mb-2">สำเร็จ! 🎉</h2>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                            {lastTransaction.isDeduction ? 'เคลมสำเร็จ! 🎉' : 'สำเร็จ! 🎉'}
+                        </h2>
                         <p className="text-gray-600 mb-4">
-                            เพิ่มแต้มให้ <span className="font-bold text-green-600">{lastTransaction.userName}</span>
+                            {lastTransaction.isDeduction ? 'หักแต้มจาก' : 'เพิ่มแต้มให้'} <span className="font-bold text-green-600">{lastTransaction.userName}</span>
                         </p>
-                        <div className="bg-green-100 text-green-700 font-bold text-3xl rounded-2xl px-6 py-4 border-2 border-green-300 mb-6">
-                            + {lastTransaction.pointsAdded} แต้ม
+                        <div className={`${lastTransaction.isDeduction ? 'bg-orange-100 text-orange-700 border-orange-300' : 'bg-green-100 text-green-700 border-green-300'} font-bold text-3xl rounded-2xl px-6 py-4 border-2 mb-6`}>
+                            {lastTransaction.isDeduction ? '- ' : '+ '}{lastTransaction.pointsAdded} แต้ม
                         </div>
                         <button 
                             onClick={resetScanner} 
@@ -145,7 +198,9 @@ export default function QRScan() {
 
                         <div className="space-y-4">
                             <div>
-                                <label className="text-gray-700 text-sm font-bold mb-2 block">จำนวนแต้มที่ต้องการเพิ่ม</label>
+                                <label className="text-gray-700 text-sm font-bold mb-2 block">
+                                    {mode === 'add' ? 'จำนวนแต้มที่ต้องการเพิ่ม' : 'จำนวนแต้มที่ต้องการหัก'}
+                                </label>
                                 <input
                                     type="number"
                                     value={pointsToAdd || ''}
@@ -175,15 +230,15 @@ export default function QRScan() {
                             <button 
                                 onClick={handleAddPoints} 
                                 disabled={isLoading || pointsToAdd <= 0}
-                                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded-2xl py-4 font-bold shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed"
+                                className={`w-full ${mode === 'add' ? 'bg-green-500 hover:bg-green-600' : 'bg-orange-500 hover:bg-orange-600'} disabled:bg-gray-400 text-white rounded-2xl py-4 font-bold shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed`}
                             >
                                 {isLoading ? (
                                     <span className="flex items-center justify-center gap-2">
                                         <span className="loading loading-spinner loading-sm" />
-                                        กำลังเพิ่ม...
+                                        {mode === 'add' ? 'กำลังเพิ่ม...' : 'กำลังหัก...'}
                                     </span>
                                 ) : (
-                                    `✓ ยืนยันเพิ่ม ${pointsToAdd || 0} แต้ม`
+                                    mode === 'add' ? `✓ เพิ่ม ${pointsToAdd} แต้ม` : `🎁 เคลม ${pointsToAdd} แต้ม`
                                 )}
                             </button>
                             <button 

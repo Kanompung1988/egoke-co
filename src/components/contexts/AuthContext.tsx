@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // MODIFIED: ปรับแก้ useEffect ทั้งหมดให้ใช้ onSnapshot
     useEffect(() => {
-        let unsubscribeFromFirestore: () => void;
+        let unsubscribeFromFirestore: (() => void) | undefined;
 
         const unsubscribeFromAuth = onAuthStateChanged(auth, (user: FirebaseUser | null) => {
             console.log('🔐 Auth state changed:', user?.email || 'No user');
@@ -38,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // ถ้ามีการเปลี่ยน user (login/logout) ให้ยกเลิกการฟังข้อมูลเก่าก่อน
             if (unsubscribeFromFirestore) {
                 unsubscribeFromFirestore();
+                unsubscribeFromFirestore = undefined;
             }
 
             if (user) {
@@ -45,31 +46,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // เมื่อมี user ล็อกอิน, ให้เริ่ม "คอยฟัง" การเปลี่ยนแปลงที่เอกสารของ user คนนั้น
                 const userDocRef = doc(db, 'users', user.uid);
                 
-                unsubscribeFromFirestore = onSnapshot(userDocRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        // ทันทีที่เอกสารถูกสร้างหรืออัปเดต, เราจะได้ข้อมูลใหม่ที่นี่
-                        const userData = docSnap.data();
-                        console.log('✅ Firestore data loaded:', { role: userData.role, points: userData.points });
+                unsubscribeFromFirestore = onSnapshot(
+                    userDocRef, 
+                    (docSnap) => {
+                        if (docSnap.exists()) {
+                            // ทันทีที่เอกสารถูกสร้างหรืออัปเดต, เราจะได้ข้อมูลใหม่ที่นี่
+                            const userData = docSnap.data();
+                            console.log('✅ Firestore data loaded:', { 
+                                role: userData.role, 
+                                points: userData.points 
+                            });
+                            setCurrentUser({
+                                uid: user.uid,
+                                email: user.email,
+                                displayName: user.displayName,
+                                photoURL: user.photoURL,
+                                role: userData.role || 'user',
+                                points: userData.points || 0,
+                            });
+                            setLoading(false);
+                        } else {
+                            console.log('⚠️  User document does not exist yet, waiting...');
+                            // กรณีที่ user ล็อกอินแล้ว แต่เอกสารยังไม่ถูกสร้าง (จะเกิดขึ้นแค่แวบเดียว)
+                            // ตั้ง role เป็น 'user' ชั่วคราว
+                            setCurrentUser({
+                                uid: user.uid,
+                                email: user.email,
+                                displayName: user.displayName,
+                                photoURL: user.photoURL,
+                                role: 'user',
+                                points: 0,
+                            });
+                            setLoading(false);
+                        }
+                    },
+                    (error) => {
+                        console.error('❌ Error listening to user document:', error);
+                        // ถ้าเกิด error ให้ตั้งค่าเริ่มต้น
                         setCurrentUser({
                             uid: user.uid,
                             email: user.email,
                             displayName: user.displayName,
                             photoURL: user.photoURL,
-                            role: userData.role || 'none',
-                            points: userData.points || 0,
+                            role: 'user',
+                            points: 0,
                         });
-                    } else {
-                        console.log('⚠️  User document does not exist yet, waiting...');
-                        // กรณีที่ user ล็อกอินแล้ว แต่เอกสารยังไม่ถูกสร้าง (จะเกิดขึ้นแค่แวบเดียว)
-                        // ไม่ต้องทำอะไร รอให้ login function สร้างเอกสาร แล้ว onSnapshot จะทำงานอีกครั้งเอง
+                        setLoading(false);
                     }
-                });
+                );
             } else {
                 console.log('👋 User logged out');
                 // ถ้า user logout
                 setCurrentUser(null);
+                setLoading(false);
             }
-            setLoading(false);
         });
 
         // Cleanup function: เมื่อ component หายไป ให้ยกเลิกการฟังทั้งหมด

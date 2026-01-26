@@ -2,13 +2,23 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useVoteSettings, useCandidates, useVoteStats } from '../hooks/useVote';
-import { db } from '../firebaseApp';
-import { doc, updateDoc, collection, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { db, getAllUsers, setUserRole } from '../firebaseApp';
+import { doc, updateDoc, collection, addDoc, deleteDoc, Timestamp, getDocs, query, where } from 'firebase/firestore';
+import BottomNav from '../components/BottomNav';
 
 interface CandidateForm {
     name: string;
     description: string;
     imageUrl: string;
+}
+
+interface UserData {
+    uid: string;
+    email: string;
+    displayName: string;
+    role: string;
+    points: number;
+    photoURL?: string;
 }
 
 export default function Admin() {
@@ -26,21 +36,75 @@ export default function Admin() {
         imageUrl: ''
     });
 
-    // Check if user is staff
+    // User Management (for Admin and SuperAdmin)
+    const [users, setUsers] = useState<UserData[]>([]);
+    const [loadingUsers, setLoadingUsers] = useState(false);
+    const [activeTab, setActiveTab] = useState<'vote' | 'users'>('vote');
+
+    const isAdmin = currentUser?.role === 'admin';
+    const isSuperAdmin = currentUser?.role === 'superadmin';
+    const canManageUsers = isAdmin || isSuperAdmin;
+
+    // Check if user is admin, staff, or superadmin
     useEffect(() => {
-        if (!loading && currentUser?.role !== 'staff') {
+        if (!loading && !['admin', 'staff', 'superadmin'].includes(currentUser?.role || '')) {
             alert('คุณไม่มีสิทธิ์เข้าถึงหน้านี้');
             navigate('/');
         }
     }, [currentUser, loading, navigate]);
 
+    // Load users if admin/superadmin
+    useEffect(() => {
+        if (canManageUsers && activeTab === 'users') {
+            loadUsers();
+        }
+    }, [canManageUsers, activeTab]);
+
+    const loadUsers = async () => {
+        setLoadingUsers(true);
+        try {
+            const allUsers = await getAllUsers();
+            setUsers(allUsers);
+        } catch (error) {
+            console.error('Failed to load users:', error);
+            alert('ไม่สามารถโหลดข้อมูลผู้ใช้ได้');
+        } finally {
+            setLoadingUsers(false);
+        }
+    };
+
+    const handleRoleChange = async (userId: string, email: string, newRole: string) => {
+        if (!confirm(`ยืนยันการเปลี่ยน Role ของ ${email} เป็น ${newRole}?`)) return;
+
+        setLoadingUsers(true);
+        try {
+            const result = await setUserRole(userId, newRole as 'user' | 'staff' | 'admin');
+            
+            if (result.success) {
+                alert(`✅ เปลี่ยน Role เป็น ${newRole} สำเร็จ`);
+                await loadUsers(); // Reload to reflect changes
+            } else {
+                alert(`❌ ${result.error}`);
+            }
+        } catch (error) {
+            console.error('Failed to update role:', error);
+            alert('❌ ไม่สามารถเปลี่ยน Role ได้: ' + (error as Error).message);
+        } finally {
+            setLoadingUsers(false);
+        }
+    };
+
     const toggleCategory = async (category: string) => {
         const categorySettings = voteSettings[category];
         if (!categorySettings) return;
 
+        console.log('🔄 Toggling category:', category, 'Current user role:', currentUser?.role);
+
         try {
             const docRef = doc(db, 'voteSettings', 'config');
             const newIsOpen = !categorySettings.isOpen;
+            
+            console.log('📝 Updating Firestore:', { category, newIsOpen });
             
             await updateDoc(docRef, {
                 [`categories.${category}.isOpen`]: newIsOpen,
@@ -48,44 +112,62 @@ export default function Admin() {
                 // If opening, create new session
                 ...(newIsOpen && { [`categories.${category}.sessionId`]: `session_${Date.now()}` })
             });
+            
+            console.log('✅ Toggle success');
+            alert(`${newIsOpen ? '✅ เปิด' : '⏸️ ปิด'}การโหวต ${category} แล้ว`);
         } catch (error) {
-            console.error('Failed to toggle category:', error);
-            alert('เกิดข้อผิดพลาดในการเปลี่ยนสถานะ');
+            console.error('❌ Failed to toggle category:', error);
+            alert('เกิดข้อผิดพลาดในการเปลี่ยนสถานะ: ' + (error as Error).message);
         }
     };
 
     const handleAddCandidate = async () => {
         if (!newCandidate.name.trim() || !newCandidate.description.trim()) {
-            alert('กรุณากรอกชื่อและคำอธิบาย');
+            alert('❌ กรุณากรอกชื่อและคำอธิบาย');
             return;
         }
 
+        console.log('➕ Adding candidate:', newCandidate, 'User role:', currentUser?.role);
+
         try {
+            // Get current max order for this category
+            const candidatesRef = collection(db, 'candidates');
+            const q = query(candidatesRef, where('category', '==', selectedCategory));
+            const snapshot = await getDocs(q);
+            const maxOrder = snapshot.docs.reduce((max: number, doc) => {
+                const order = doc.data().order || 0;
+                return order > max ? order : max;
+            }, 0);
+
             await addDoc(collection(db, 'candidates'), {
                 ...newCandidate,
                 category: selectedCategory,
                 voteCount: 0,
-                createdAt: Timestamp.now()
+                order: maxOrder + 1,
+                createdAt: Timestamp.now(),
+                createdBy: currentUser?.uid || 'unknown'
             });
 
             setNewCandidate({ name: '', description: '', imageUrl: '' });
             setShowAddModal(false);
-            alert('เพิ่มผู้สมัครสำเร็จ');
+            alert('✅ เพิ่มผู้สมัครสำเร็จ');
         } catch (error) {
-            console.error('Failed to add candidate:', error);
-            alert('เกิดข้อผิดพลาดในการเพิ่มผู้สมัคร');
+            console.error('❌ Failed to add candidate:', error);
+            alert('❌ เกิดข้อผิดพลาดในการเพิ่มผู้สมัคร: ' + (error as Error).message);
         }
     };
 
     const handleDeleteCandidate = async (candidateId: string, candidateName: string) => {
         if (!confirm(`คุณแน่ใจหรือไม่ที่จะลบ "${candidateName}"?`)) return;
 
+        console.log('🗑️ Deleting candidate:', candidateId, 'User role:', currentUser?.role);
+
         try {
             await deleteDoc(doc(db, 'candidates', candidateId));
-            alert('ลบผู้สมัครสำเร็จ');
+            alert('✅ ลบผู้สมัครสำเร็จ');
         } catch (error) {
-            console.error('Failed to delete candidate:', error);
-            alert('เกิดข้อผิดพลาดในการลบผู้สมัคร');
+            console.error('❌ Failed to delete candidate:', error);
+            alert('เกิดข้อผิดพลาดในการลบผู้สมัคร: ' + (error as Error).message);
         }
     };
 
@@ -101,7 +183,7 @@ export default function Admin() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100">
+        <div className="min-h-screen bg-gray-100 pb-24">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 shadow-lg">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -109,7 +191,7 @@ export default function Admin() {
                         <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
                             🛡️ Admin Dashboard
                         </h1>
-                        <p className="text-purple-100">จัดการระบบโหวต</p>
+                        <p className="text-purple-100">จัดการระบบโหวต{canManageUsers && ' และผู้ใช้'}</p>
                     </div>
                     <button
                         onClick={() => navigate('/')}
@@ -121,6 +203,115 @@ export default function Admin() {
             </div>
 
             <div className="max-w-7xl mx-auto p-6">
+                {/* Tab Navigation (for Admin/SuperAdmin only) */}
+                {canManageUsers && (
+                    <div className="flex gap-2 mb-6">
+                        <button
+                            onClick={() => setActiveTab('vote')}
+                            className={`flex-1 py-4 rounded-xl font-bold transition-all ${
+                                activeTab === 'vote'
+                                    ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg'
+                                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                            }`}
+                        >
+                            🎯 จัดการระบบโหวต
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('users')}
+                            className={`flex-1 py-4 rounded-xl font-bold transition-all ${
+                                activeTab === 'users'
+                                    ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg'
+                                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                            }`}
+                        >
+                            👥 จัดการผู้ใช้
+                        </button>
+                    </div>
+                )}
+
+                {/* User Management Panel */}
+                {activeTab === 'users' && canManageUsers && (
+                    <div className="bg-white rounded-2xl p-6 shadow-xl">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-2xl font-bold text-gray-800">👥 จัดการผู้ใช้และสิทธิ์</h2>
+                            <button
+                                onClick={loadUsers}
+                                disabled={loadingUsers}
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-bold transition-colors disabled:opacity-50"
+                            >
+                                {loadingUsers ? '⏳ กำลังโหลด...' : '🔄 รีเฟรช'}
+                            </button>
+                        </div>
+
+                        {loadingUsers ? (
+                            <div className="text-center py-12">
+                                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent"></div>
+                                <p className="mt-4 text-gray-600">กำลังโหลดข้อมูลผู้ใช้...</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b-2 border-gray-200">
+                                            <th className="text-left p-3 font-bold text-gray-700">อีเมล</th>
+                                            <th className="text-left p-3 font-bold text-gray-700">ชื่อ</th>
+                                            <th className="text-center p-3 font-bold text-gray-700">Role</th>
+                                            <th className="text-right p-3 font-bold text-gray-700">Points</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {users.map((user) => (
+                                            <tr key={user.uid} className="border-b border-gray-100 hover:bg-gray-50">
+                                                <td className="p-3 text-sm text-gray-800">{user.email}</td>
+                                                <td className="p-3 text-sm text-gray-800">{user.displayName}</td>
+                                                <td className="p-3 text-center">
+                                                    {user.role === 'superadmin' ? (
+                                                        <span className="inline-block bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                                                            👑 SuperAdmin
+                                                        </span>
+                                                    ) : (
+                                                        <select
+                                                            value={user.role}
+                                                            onChange={(e) => handleRoleChange(user.uid, user.email, e.target.value)}
+                                                            className="bg-gray-100 border-2 border-gray-300 rounded-lg px-3 py-1 font-bold text-sm focus:border-purple-500 focus:outline-none"
+                                                        >
+                                                            <option value="user">👤 User</option>
+                                                            <option value="staff">🔧 Staff</option>
+                                                            {isSuperAdmin && <option value="admin">🛡️ Admin</option>}
+                                                        </select>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 text-right font-mono text-sm">{user.points.toLocaleString()}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+
+                                {users.length === 0 && (
+                                    <div className="text-center py-12 text-gray-500">
+                                        ไม่พบข้อมูลผู้ใช้
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                            <div className="text-sm text-blue-800">
+                                <strong>ℹ️ หมายเหตุ:</strong>
+                                <ul className="list-disc ml-4 mt-2 space-y-1">
+                                    <li>👤 <strong>User</strong>: ผู้ใช้ทั่วไป</li>
+                                    <li>🔧 <strong>Staff</strong>: จัดการระบบโหวต</li>
+                                    <li>🛡️ <strong>Admin</strong>: จัดการระบบโหวต + เพิ่ม Staff</li>
+                                    <li>👑 <strong>SuperAdmin</strong>: สิทธิ์เต็ม (เพิ่ม Admin ได้)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Vote Management Panel */}
+                {activeTab === 'vote' && (
+                    <>
                 {/* Vote Control Panel */}
                 <div className="bg-white rounded-2xl p-6 shadow-xl mb-6">
                     <h2 className="text-2xl font-bold text-gray-800 mb-4">🎛️ ควบคุมการโหวต</h2>
@@ -288,6 +479,8 @@ export default function Admin() {
                         )}
                     </div>
                 </div>
+                </>
+                )}
             </div>
 
             {/* Add Candidate Modal */}
@@ -374,6 +567,8 @@ export default function Admin() {
                     </div>
                 </div>
             )}
+
+            <BottomNav />
         </div>
     );
 }

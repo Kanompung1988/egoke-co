@@ -4,8 +4,7 @@ import {
     getAuth,
     onAuthStateChanged,
     GoogleAuthProvider,
-    signInWithRedirect,
-    getRedirectResult,
+    signInWithPopup,
     signOut,
     type Unsubscribe,
     type User
@@ -17,6 +16,10 @@ import {
     setDoc,
     updateDoc,
     increment,
+    collection,
+    query,
+    where,
+    getDocs,
     type Firestore
 } from "firebase/firestore";
 
@@ -29,7 +32,7 @@ const firebaseConfig = {
     messagingSenderId: "910235640821",
     appId: "1:910235640821:web:cc5163a4eee3e8dffc76bc",
     measurementId: "G-10MPJ3TPEB",
-}
+};
 
 // เริ่มต้น Firebase App
 const app: FirebaseApp = initializeApp(firebaseConfig);
@@ -37,142 +40,171 @@ export const auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
-
-// -------------------------------------
-// ฟังก์ชันสำหรับ Staff Login โดยเฉพาะ
-// -------------------------------------
-export async function loginAsStaff(staffCode: string): Promise<{ success: boolean; error: string | null }> {
-    if (!staffCode) {
-        return { success: false, error: "กรุณากรอก Staff Code" };
-    }
-
-    // 1. ตรวจสอบ Staff Code ก่อน
-    const role = await validateStaffCode(staffCode);
-    if (!role) {
-        return { success: false, error: "Staff Code ไม่ถูกต้อง" };
-    }
-
-    // 2. ถ้าโค้ดถูกต้อง ให้เก็บ role ไว้ใน localStorage และเริ่ม redirect
-    try {
-        console.log(`✅ Valid staff code. Role: ${role}`);
-        // เก็บ role ไว้ใน localStorage เพื่อใช้หลัง redirect กลับมา
-        localStorage.setItem('pendingStaffRole', role);
-        
-        // ทำการ redirect ไป Google login
-        await signInWithRedirect(auth, provider);
-        
-        return { success: true, error: null };
-
-    } catch (error) {
-        console.error("❌ Staff login error:", error);
-        localStorage.removeItem('pendingStaffRole');
-        const errorMessage = (error as Error).message || "เกิดข้อผิดพลาดระหว่างการล็อกอิน";
-        return { success: false, error: errorMessage };
-    }
-}
+// SuperAdmin Email - ผู้ที่มีสิทธิ์สูงสุด
+const SUPER_ADMIN_EMAIL = "thanaponchanal@gmail.com";
 
 // ----------------------------------------------
-// ฟังก์ชันล็อกอินสำหรับผู้ใช้ทั่วไป (แบบง่าย)
+// ฟังก์ชันล็อกอินด้วย Google (แบบ Popup)
 // ----------------------------------------------
 export async function loginWithGoogle(): Promise<User | null> {
     try {
-        console.log('🔓 Starting Google login with redirect...');
-        // ใช้ redirect แทน popup เพื่อหลีกเลี่ยงปัญหา popup blocker
-        await signInWithRedirect(auth, provider);
-        // หลังจาก redirect กลับมา จะจัดการต่อที่ handleRedirectResult
-        return null; // จะได้ผลลัพธ์จาก redirect ในภายหลัง
-    } catch (error: any) {
-        console.error("❌ Login error:", error.code, error.message);
-        if (error.code === 'auth/popup-closed-by-user') {
+        console.log('🔓 Opening Google popup...');
+        
+        // ใช้ popup
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        console.log("✅ Google auth success:", user.email);
+
+        // สร้างหรืออัพเดท user document
+        await createOrUpdateUserDocument(user);
+
+        return user;
+    } catch (error: unknown) {
+        const err = error as { code?: string; message?: string };
+        console.error("❌ Login error:", err.code, err.message);
+        
+        if (err.code === 'auth/popup-closed-by-user') {
             console.log('User closed the popup');
-        } else if (error.code === 'auth/unauthorized-domain') {
-            console.error('⚠️  Domain not authorized in Firebase Console!');
+        } else if (err.code === 'auth/popup-blocked') {
+            console.error('⚠️ Popup was blocked! Please allow popups.');
+            alert('กรุณาอนุญาต popup ใน browser ของคุณ');
+        } else if (err.code === 'auth/unauthorized-domain') {
+            console.error('⚠️ Domain not authorized in Firebase Console!');
         }
         return null;
     }
 }
 
-// ฟังก์ชันจัดการผลลัพธ์หลังจาก redirect กลับมา
-export async function handleRedirectResult(): Promise<User | null> {
-    try {
-        console.log('🔍 Checking for redirect result...');
-        const result = await getRedirectResult(auth);
-        
-        if (result) {
-            const user = result.user;
-            console.log("✅ Google auth success:", user.email);
-
-            const userRef = doc(db, "users", user.uid);
-            const snapshot = await getDoc(userRef);
-
-            // เช็คว่าเป็น staff login หรือไม่
-            const pendingStaffRole = localStorage.getItem('pendingStaffRole');
-            
-            if (pendingStaffRole) {
-                // เป็น Staff Login
-                console.log(`👮 Staff login with role: ${pendingStaffRole}`);
-                localStorage.removeItem('pendingStaffRole');
-                
-                if (!snapshot.exists()) {
-                    console.log('📝 Creating new staff user document...');
-                    await createUserDocument(user, pendingStaffRole);
-                    console.log('✅ Staff user document created');
-                } else {
-                    console.log('👮 Existing staff user');
-                }
-            } else {
-                // เป็น User Login ทั่วไป
-                if (!snapshot.exists()) {
-                    console.log('📝 Creating new user document...');
-                    await createUserDocument(user, "none");
-                    console.log('✅ User document created');
-                } else {
-                    console.log('👤 Existing user, document already exists');
-                }
-            }
-
-            return user;
-        }
-        
-        console.log('ℹ️  No redirect result found');
-        return null;
-    } catch (error: any) {
-        console.error("❌ Redirect result error:", error.code, error.message);
-        localStorage.removeItem('pendingStaffRole'); // ล้างข้อมูลถ้าเกิด error
-        return null;
-    }
-}
-
 // ----------------------------------------------
-// ฟังก์ชัน Helper (ใช้ร่วมกัน)
+// สร้างหรืออัพเดท User Document ใน Firestore
 // ----------------------------------------------
-async function createUserDocument(user: User, role: string): Promise<void> {
+async function createOrUpdateUserDocument(user: User): Promise<void> {
     const userRef = doc(db, "users", user.uid);
-    const newUser = {
-        uid: user.uid,
-        displayName: user.displayName ?? "Anonymous",
-        email: user.email ?? "",
-        points: 0,
-        role: role,
-    };
-    await setDoc(userRef, newUser);
-    console.log(`✨ New user created in Firestore with role: ${role}`);
-}
-
-async function validateStaffCode(code: string): Promise<string | null> {
-    if (!code) return null;
-    const codeRef = doc(db, "staffCodes", code);
-    const snapshot = await getDoc(codeRef);
-    if (snapshot.exists()) {
-        const data = snapshot.data();
-        console.log(`Valid code entered. Role: ${data.role}`);
-        return data.role;
+    const snapshot = await getDoc(userRef);
+    
+    // กำหนด role ตาม email
+    let role = "user"; // default role
+    
+    if (user.email === SUPER_ADMIN_EMAIL) {
+        role = "superadmin";
+    }
+    
+    if (!snapshot.exists()) {
+        // สร้าง user ใหม่
+        const newUser = {
+            uid: user.uid,
+            displayName: user.displayName ?? "Anonymous",
+            email: user.email ?? "",
+            photoURL: user.photoURL ?? "",
+            points: role === "superadmin" ? 999999999 : 0,
+            tickets: role === "superadmin" ? 999999 : 0,
+            role: role,
+            createdAt: new Date(),
+        };
+        await setDoc(userRef, newUser);
+        console.log(`✨ New user created with role: ${role}`);
     } else {
-        console.warn("Invalid code entered.");
-        return null;
+        // ถ้าเป็น superadmin ให้อัพเดท role เสมอ
+        if (user.email === SUPER_ADMIN_EMAIL) {
+            await updateDoc(userRef, {
+                role: "superadmin",
+                points: 999999999,
+                tickets: 999999,
+            });
+            console.log("👑 SuperAdmin updated");
+        }
+        console.log('� Existing user logged in');
     }
 }
 
+// ----------------------------------------------
+// ฟังก์ชันสำหรับ SuperAdmin: เปลี่ยน role ของ user (รับทั้ง email และ uid)
+// ----------------------------------------------
+export async function setUserRole(
+    identifier: string, // อาจเป็น email หรือ uid
+    newRole: "user" | "staff" | "admin"
+): Promise<{ success: boolean; error: string | null }> {
+    try {
+        let userId: string | null = null;
+        let userEmail: string | null = null;
+        
+        // ถ้า identifier มี @ แสดงว่าเป็น email
+        if (identifier.includes('@')) {
+            // หา user จาก email
+            const usersRef = collection(db, "users");
+            const q = query(usersRef, where("email", "==", identifier));
+            const querySnapshot = await getDocs(q);
+            
+            if (querySnapshot.empty) {
+                return { success: false, error: "ไม่พบผู้ใช้นี้ในระบบ" };
+            }
+            
+            const userDoc = querySnapshot.docs[0];
+            userId = userDoc.id;
+            userEmail = userDoc.data().email;
+        } else {
+            // ถ้าเป็น uid ให้ดึงข้อมูลโดยตรง
+            userId = identifier;
+            const userDoc = await getDoc(doc(db, "users", userId));
+            
+            if (!userDoc.exists()) {
+                return { success: false, error: "ไม่พบผู้ใช้นี้ในระบบ" };
+            }
+            
+            userEmail = userDoc.data().email;
+        }
+        
+        // ห้ามเปลี่ยน role ของ superadmin
+        if (userEmail === SUPER_ADMIN_EMAIL) {
+            return { success: false, error: "ไม่สามารถเปลี่ยน role ของ SuperAdmin ได้" };
+        }
+        
+        await updateDoc(doc(db, "users", userId), {
+            role: newRole,
+            updatedAt: new Date(),
+        });
+        
+        console.log(`✅ Updated user ${userEmail} (${userId}) to role: ${newRole}`);
+        return { success: true, error: null };
+    } catch (error) {
+        console.error("❌ Error setting user role:", error);
+        return { success: false, error: "เกิดข้อผิดพลาดในการอัพเดท role" };
+    }
+}
+
+// ----------------------------------------------
+// ดึงรายชื่อ users ทั้งหมด (สำหรับ SuperAdmin)
+// ----------------------------------------------
+export async function getAllUsers(): Promise<Array<{
+    uid: string;
+    email: string;
+    displayName: string;
+    role: string;
+    points: number;
+}>> {
+    try {
+        const usersRef = collection(db, "users");
+        const querySnapshot = await getDocs(usersRef);
+        
+        return querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                uid: doc.id,
+                email: data.email || "",
+                displayName: data.displayName || "",
+                role: data.role || "user",
+                points: data.points || 0,
+            };
+        });
+    } catch (error) {
+        console.error("❌ Error getting users:", error);
+        return [];
+    }
+}
+
+// ----------------------------------------------
+// Logout
+// ----------------------------------------------
 export async function logout(): Promise<void> {
     try {
         await signOut(auth);
@@ -182,77 +214,93 @@ export async function logout(): Promise<void> {
     }
 }
 
+// ----------------------------------------------
+// Watch Auth State
+// ----------------------------------------------
 export function watchAuthState(callback: (user: User | null) => void): Unsubscribe {
     return onAuthStateChanged(auth, callback);
 }
 
+// ----------------------------------------------
+// Points Management
+// ----------------------------------------------
 export async function addPointsToUser(uid: string, pointsToAdd: number) {
-    // ตรวจสอบข้อมูลเบื้องต้น
     if (!uid || !pointsToAdd || pointsToAdd <= 0) {
         throw new Error("Invalid user ID or points value.");
     }
-
-    // สร้าง reference ไปยังเอกสารของผู้ใช้คนนั้นๆ
     const userRef = doc(db, "users", uid);
-
     try {
-        // ใช้ increment() เพื่อบวกค่าใหม่เข้ากับค่าเก่าใน database โดยตรง
-        // วิธีนี้ปลอดภัยและป้องกันข้อมูลผิดพลาดกรณีมีคนแอดแต้มพร้อมกัน
         await updateDoc(userRef, {
             points: increment(pointsToAdd)
         });
-
-        console.log(`Successfully added ${pointsToAdd} points to user ${uid}`);
-
-        // ดึงข้อมูลล่าสุดหลังอัปเดตเสร็จ เพื่อส่งกลับไปแสดงผลที่หน้าจอทันที
+        console.log(`✅ Added ${pointsToAdd} points to user ${uid}`);
         const updatedDoc = await getDoc(userRef);
         return updatedDoc.data();
-
     } catch (error) {
-        console.error("Error adding points:", error);
-        // ส่ง error กลับไปให้หน้า UI รับรู้และแสดงข้อความแจ้งเตือน
+        console.error("❌ Error adding points:", error);
         throw error;
     }
 }
 
 export async function deductPointsFromUser(uid: string, pointsToDeduct: number) {
-
     if (!uid || !pointsToDeduct || pointsToDeduct <= 0) {
         throw new Error("Invalid user ID or points value.");
     }
-
     const userRef = doc(db, "users", uid);
     try {
         await updateDoc(userRef, {
             points: increment(-pointsToDeduct)
         });
-
-        console.log(`Successfully deducted ${pointsToDeduct} points from user ${uid}`);
-
+        console.log(`✅ Deducted ${pointsToDeduct} points from user ${uid}`);
         const updatedDoc = await getDoc(userRef);
         return updatedDoc.data();
-
     } catch (error) {
-        console.error("Error deducting points:", error);
+        console.error("❌ Error deducting points:", error);
         throw error;
     }
 }
 
-export async function getUserProfile(uid: string)
-{
-    if(!uid) return;
+// ----------------------------------------------
+// Get User Profile
+// ----------------------------------------------
+export async function getUserProfile(uid: string) {
+    if (!uid) return null;
     const userRef = doc(db, "users", uid);
     const docSnap = await getDoc(userRef);
     return docSnap.exists() ? docSnap.data() : null;
 }
-/*
-const firebaseConfig = {
-    apiKey: "AIzaSyDCjt8DfkKCsjc73Oaay851FYu8pG1-3TY",
-    authDomain: "egoke-7dae5.firebaseapp.com",
-    projectId: "egoke-7dae5",
-    storageBucket: "egoke-7dae5.appspot.com",
-    messagingSenderId: "910235640821",
-    appId: "1:910235640821:web:cc5163a4eee3e8dffc76bc",
-    measurementId: "G-10MPJ3TPEB",
+
+// ----------------------------------------------
+// Check if user is SuperAdmin
+// ----------------------------------------------
+export function isSuperAdmin(email: string | null): boolean {
+    return email === SUPER_ADMIN_EMAIL;
 }
-*/
+
+// ----------------------------------------------
+// Check user role with hierarchical permissions
+// SuperAdmin > Admin > Staff > User
+// ----------------------------------------------
+export function hasAdminAccess(role: string | null | undefined): boolean {
+    return role === 'superadmin' || role === 'admin';
+}
+
+export function hasStaffAccess(role: string | null | undefined): boolean {
+    return role === 'superadmin' || role === 'admin' || role === 'staff';
+}
+
+export function isRole(role: string | null | undefined, targetRole: string): boolean {
+    if (!role) return false;
+    
+    const hierarchy: Record<string, number> = {
+        'superadmin': 4,
+        'admin': 3,
+        'staff': 2,
+        'user': 1
+    };
+    
+    const userLevel = hierarchy[role] || 0;
+    const targetLevel = hierarchy[targetRole] || 0;
+    
+    return userLevel >= targetLevel;
+}

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { 
     collection, 
     doc, 
-    getDoc, 
     getDocs, 
     setDoc, 
     updateDoc, 
@@ -154,7 +153,9 @@ export async function submitVote(
             return { success: false, error: 'กรุณาเข้าสู่ระบบก่อนโหวต' };
         }
 
-        // Check if already voted
+        console.log('🗳️ Submitting vote:', { category, sessionId, candidateId: candidate.id });
+
+        // Check if already voted in this session
         const votesRef = collection(db, 'votes');
         const q = query(
             votesRef,
@@ -165,10 +166,12 @@ export async function submitVote(
         const existingVotes = await getDocs(q);
 
         if (!existingVotes.empty) {
-            return { success: false, error: 'คุณโหวตหมวดนี้ไปแล้ว' };
+            console.log('❌ User already voted in this session');
+            return { success: false, error: 'คุณโหวตในหมวดนี้ไปแล้ว' };
         }
 
-        // Create vote record
+        // Create vote record with unique ID
+        const voteId = `${user.uid}_${category}_${sessionId}`;
         const voteData: VoteRecord = {
             userId: user.uid,
             userName: user.displayName || 'Anonymous',
@@ -179,34 +182,25 @@ export async function submitVote(
             timestamp: Timestamp.now()
         };
 
-        // Add vote
-        await setDoc(doc(collection(db, 'votes')), voteData);
+        console.log('📝 Creating vote record:', voteId);
+
+        // Add vote with specific ID to prevent duplicates
+        await setDoc(doc(db, 'votes', voteId), voteData);
 
         // Update candidate vote count
         const candidateRef = doc(db, 'candidates', candidate.id);
         await updateDoc(candidateRef, {
-            voteCount: increment(1)
+            voteCount: increment(1),
+            lastVotedAt: Timestamp.now()
         });
 
-        // Update user's voted sessions
-        const userRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userRef);
-        const votedSessions = userDoc.data()?.votedSessions || [];
-        
-        await updateDoc(userRef, {
-            votedSessions: [...votedSessions, sessionId],
-            voteHistory: [...(userDoc.data()?.voteHistory || []), {
-                category,
-                candidateId: candidate.id,
-                candidateName: candidate.name,
-                timestamp: Timestamp.now()
-            }]
-        });
+        console.log('✅ Vote submitted successfully');
 
         return { success: true };
     } catch (error) {
-        console.error('Error submitting vote:', error);
-        return { success: false, error: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง' };
+        console.error('❌ Error submitting vote:', error);
+        const errorMessage = error instanceof Error ? error.message : 'เกิดข้อผิดพลาด';
+        return { success: false, error: `ไม่สามารถโหวตได้: ${errorMessage}` };
     }
 }
 

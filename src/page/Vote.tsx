@@ -68,11 +68,32 @@ export default function Vote() {
     useEffect(() => {
         if (!settingsLoading && Object.keys(voteSettings).length > 0) {
             const openCategory = Object.entries(voteSettings).find(([_, settings]) => settings.isOpen);
-            if (openCategory) {
+            if (openCategory && openCategory[0] !== selectedCategory) {
+                console.log('🎯 Auto-selecting open category:', openCategory[0]);
                 setSelectedCategory(openCategory[0]);
             }
         }
     }, [voteSettings, settingsLoading]);
+
+    // Monitor vote status changes and send notifications
+    useEffect(() => {
+        if (!settingsLoading && categorySettings && notificationEnabled) {
+            const wasOpen = localStorage.getItem(`voteOpen_${selectedCategory}`);
+            const isNowOpen = categorySettings.isOpen;
+
+            if (wasOpen === 'false' && isNowOpen && !hasVoted) {
+                // Vote just opened!
+                new Notification('🎉 เปิดให้โหวตแล้ว!', {
+                    body: `หมวด ${CATEGORIES.find(c => c.id === selectedCategory)?.name} เปิดให้โหวตแล้ว`,
+                    icon: '/logo.jpg',
+                    tag: `vote-${selectedCategory}`,
+                    requireInteraction: true
+                });
+            }
+
+            localStorage.setItem(`voteOpen_${selectedCategory}`, isNowOpen.toString());
+        }
+    }, [categorySettings?.isOpen, selectedCategory, settingsLoading, notificationEnabled, hasVoted]);
 
     // Find voted candidate for display
     useEffect(() => {

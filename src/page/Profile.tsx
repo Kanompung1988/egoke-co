@@ -93,6 +93,28 @@ export default function Me() {
 
                         {/* Action Buttons */}
                         <div className="space-y-2">
+                            {/* Admin/Staff/SuperAdmin Panel Button */}
+                            {['admin', 'staff', 'superadmin'].includes(currentUser.role || '') && (
+                                <button
+                                    onClick={() => navigate('/admin')}
+                                    className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-xl py-3 font-bold shadow-lg transition-all active:scale-95"
+                                >
+                                    {currentUser.role === 'superadmin' ? '👑 SuperAdmin Panel' : 
+                                     currentUser.role === 'admin' ? '🛡️ Admin Panel' : 
+                                     '🔧 Staff Panel'}
+                                </button>
+                            )}
+
+                            {/* SuperAdmin Only */}
+                            {currentUser.role === 'superadmin' && (
+                                <button
+                                    onClick={() => navigate('/superadmin')}
+                                    className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl py-3 font-bold shadow-lg transition-all active:scale-95"
+                                >
+                                    👑 SuperAdmin Control
+                                </button>
+                            )}
+
                             <button
                                 onClick={() => navigate('/game')}
                                 className="w-full bg-red-500 hover:bg-red-600 text-white rounded-xl py-3 font-bold shadow-lg transition-all active:scale-95"
