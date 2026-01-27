@@ -32,3 +32,8 @@ dist-ssr
 
 # Keep .env.example for reference
 !.env.example
+
+# Firebase service account credentials - DO NOT COMMIT
+functions/**/*.json
+!functions/package.json
+!functions/tsconfig*.json
