@@ -48,18 +48,16 @@ export default function Game() {
     const wheelRef = useRef<HTMLDivElement | null>(null);
     const currentRotationRef = useRef<number>(0);
 
-    // Prize definitions
+    // Prize definitions - Updated with new prizes and probabilities
     const prizes = useMemo(
         () => [
-            { label: "ตั๋วกิจกรรมฟรี", emoji: "🎫", color: "#dc2626", probability: 15 },
-            { label: "ตั๋วโหวตฟรี", emoji: "🗳️", color: "#ef4444", probability: 15 },
-            { label: "ขนมกรุบกรอบ", emoji: "🍿", color: "#dc2626", probability: 20 },
-            { label: "ตุ๊กตาไซส์เล็ก", emoji: "🧸", color: "#ef4444", probability: 20 },
-            { label: "ตุ๊กตากลาง", emoji: "🧸🧸", color: "#dc2626", probability: 15 },
-            { label: "ตุ๊กตาใหญ่", emoji: "🧸🧸🧸", color: "#ef4444", probability: 5 },
-            { label: "สมุดโน้ต", emoji: "📓", color: "#dc2626", probability: 20 },
-            { label: "ยางมัดผม", emoji: "🎀", color: "#ef4444", probability: 20 },
-            { label: "ขนมสปอนเซอร์", emoji: "🍬", color: "#dc2626", probability: 10 },
+            { label: "ตุ๊กตาใหญ่", emoji: "🧸🧸🧸", color: "#dc2626", probability: 0.1 },
+            { label: "ตุ๊กตาไซส์เล็ก", emoji: "🧸", color: "#ef4444", probability: 2.9 },
+            { label: "ตั๋วเล่นกิจกรรมฟรี", emoji: "🎫", color: "#dc2626", probability: 35.0 },
+            { label: "คูปองสปอนเซอร์", emoji: "🎟️", color: "#ef4444", probability: 30.0 },
+            { label: "ตั๋วโหวตฟรี", emoji: "�️", color: "#dc2626", probability: 10.0 },
+            { label: "ขนมสปอนเซอร์", emoji: "�", color: "#ef4444", probability: 5.0 },
+            { label: "ขนมกรุบกรอบปลอบใจ", emoji: "�", color: "#dc2626", probability: 17.0 },
         ],
         []
     );
