@@ -136,19 +136,36 @@ export default function Home() {
                             <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-yellow-300/10 rounded-full blur-xl group-hover:bg-yellow-300/20 transition-all duration-500"></div>
                             <div className="absolute inset-0 bg-gradient-to-t from-black/0 to-white/0 group-hover:from-black/5 transition-all duration-300"></div>
                         </div>
-                        <div 
-                            onClick={() => navigate('/qrscan')}
-                            className="group relative overflow-hidden bg-gradient-to-br from-red-500 via-red-600 to-red-700 p-5 rounded-2xl text-white cursor-pointer shadow-xl hover:shadow-2xl transition-all duration-300 active:scale-95 border-3 border-amber-400 hover:border-amber-300 hover:-translate-y-1"
-                        >
-                            <div className="relative z-10">
-                                <div className="text-4xl mb-2 transform group-hover:scale-110 transition-transform duration-300">📱</div>
-                                <h3 className="font-bold text-shadow text-lg mb-1">สแกน QR</h3>
-                                <p className="text-white/90 text-xs">รับแต้มสะสม</p>
+                        {/* Show "ส่งวาปไอจีขึ้นจอ" for regular users, "สแกน QR" for admin/staff */}
+                        {currentUser && ['admin', 'staff', 'superadmin'].includes(currentUser.role || '') ? (
+                            <div 
+                                onClick={() => navigate('/qrscan')}
+                                className="group relative overflow-hidden bg-gradient-to-br from-red-500 via-red-600 to-red-700 p-5 rounded-2xl text-white cursor-pointer shadow-xl hover:shadow-2xl transition-all duration-300 active:scale-95 border-3 border-amber-400 hover:border-amber-300 hover:-translate-y-1"
+                            >
+                                <div className="relative z-10">
+                                    <div className="text-4xl mb-2 transform group-hover:scale-110 transition-transform duration-300">📱</div>
+                                    <h3 className="font-bold text-shadow text-lg mb-1">สแกน QR</h3>
+                                    <p className="text-white/90 text-xs">รับแต้มสะสม</p>
+                                </div>
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-amber-400/10 rounded-full blur-2xl group-hover:bg-amber-400/20 transition-all duration-500"></div>
+                                <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-yellow-300/10 rounded-full blur-xl group-hover:bg-yellow-300/20 transition-all duration-500"></div>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/0 to-white/0 group-hover:from-black/5 transition-all duration-300"></div>
                             </div>
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-400/10 rounded-full blur-2xl group-hover:bg-amber-400/20 transition-all duration-500"></div>
-                            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-yellow-300/10 rounded-full blur-xl group-hover:bg-yellow-300/20 transition-all duration-500"></div>
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/0 to-white/0 group-hover:from-black/5 transition-all duration-300"></div>
-                        </div>
+                        ) : (
+                            <div 
+                                onClick={() => navigate('/vap-ig')}
+                                className="group relative overflow-hidden bg-gradient-to-br from-red-500 via-red-600 to-red-700 p-5 rounded-2xl text-white cursor-pointer shadow-xl hover:shadow-2xl transition-all duration-300 active:scale-95 border-3 border-amber-400 hover:border-amber-300 hover:-translate-y-1"
+                            >
+                                <div className="relative z-10">
+                                    <div className="text-4xl mb-2 transform group-hover:scale-110 transition-transform duration-300">📱</div>
+                                    <h3 className="font-bold text-shadow text-lg mb-1">ส่งวาปไอจี</h3>
+                                    <p className="text-white/90 text-xs">ขึ้นจอใหญ่</p>
+                                </div>
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-amber-400/10 rounded-full blur-2xl group-hover:bg-amber-400/20 transition-all duration-500"></div>
+                                <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-yellow-300/10 rounded-full blur-xl group-hover:bg-yellow-300/20 transition-all duration-500"></div>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/0 to-white/0 group-hover:from-black/5 transition-all duration-300"></div>
+                            </div>
+                        )}
                         <div 
                             onClick={() => navigate('/profile')}
                             className="group relative overflow-hidden bg-gradient-to-br from-red-500 via-red-600 to-red-700 p-5 rounded-2xl text-white cursor-pointer shadow-xl hover:shadow-2xl transition-all duration-300 active:scale-95 border-3 border-amber-400 hover:border-amber-300 hover:-translate-y-1"
