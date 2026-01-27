@@ -22,6 +22,13 @@ import {
     getDocs,
     type Firestore
 } from "firebase/firestore";
+import { 
+    getStorage, 
+    ref, 
+    uploadBytes, 
+    getDownloadURL,
+    type FirebaseStorage 
+} from "firebase/storage";
 
 // ✅ ตั้งค่า Firebase จาก Environment Variables
 /*
@@ -55,6 +62,7 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
 const app: FirebaseApp = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
+export const storage: FirebaseStorage = getStorage(app);
 const provider = new GoogleAuthProvider();
 
 // ✅ SuperAdmin Email - จาก Environment Variables
@@ -326,4 +334,46 @@ export function isRole(role: string | null | undefined, targetRole: string): boo
     const targetLevel = hierarchy[targetRole] || 0;
     
     return userLevel >= targetLevel;
+}
+
+/**
+ * Upload image to Firebase Storage
+ * @param file - Image file to upload
+ * @param path - Storage path (e.g., 'candidates/band/image.jpg')
+ * @returns Promise<string> - Download URL
+ */
+export async function uploadImage(file: File, path: string): Promise<string> {
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    return downloadURL;
+}
+
+// ----------------------------------------------
+// ฟังก์ชันอัปโหลดรูปไปยัง Firebase Storage
+// ----------------------------------------------
+export async function uploadCandidateImage(
+    file: File,
+    category: string,
+    candidateName: string
+): Promise<string> {
+    try {
+        const timestamp = Date.now();
+        const sanitizedName = candidateName.replace(/[^a-zA-Z0-9ก-๙]/g, '_');
+        const fileName = `${category}/${sanitizedName}_${timestamp}.${file.name.split('.').pop()}`;
+        
+        const storageRef = ref(storage, `candidates/${fileName}`);
+        
+        console.log('⬆️ กำลังอัปโหลดรูป:', fileName);
+        
+        const snapshot = await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        
+        console.log('✅ อัปโหลดสำเร็จ:', downloadURL);
+        
+        return downloadURL;
+    } catch (error) {
+        console.error('❌ อัปโหลดรูปล้มเหลว:', error);
+        throw new Error('ไม่สามารถอัปโหลดรูปภาพได้');
+    }
 }

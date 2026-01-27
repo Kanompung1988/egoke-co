@@ -2,17 +2,18 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useVoteSettings, useCandidates, useVoteStats } from '../hooks/useVote';
-import { db, getAllUsers, setUserRole } from '../firebaseApp';
+import { db, getAllUsers, setUserRole, uploadImage } from '../firebaseApp';
 import { doc, updateDoc, collection, addDoc, deleteDoc, Timestamp, getDocs, query, where, setDoc } from 'firebase/firestore';
 import BottomNav from '../components/BottomNav';
 import type { VoteCategory } from '../hooks/useVote'; // นำเข้า type ถ้ามี
 
-// ✅ 1. เพิ่ม sheetId ใน Interface
+// ✅ 1. เพิ่ม sheetId และ imageFile ใน Interface
 interface CandidateForm {
     name: string;
     description: string;
     imageUrl: string;
     sheetId: string;
+    imageFile: File | null;
 }
 
 interface UserData {
@@ -39,13 +40,15 @@ export default function Admin() {
 
     const [showAddModal, setShowAddModal] = useState(false);
     
-    // ✅ 2. เพิ่มค่าเริ่มต้น sheetId เป็นค่าว่าง
+    // ✅ 2. เพิ่มค่าเริ่มต้น sheetId และ imageFile
     const [newCandidate, setNewCandidate] = useState<CandidateForm>({
         name: '',
         description: '',
         imageUrl: '',
-        sheetId: '' 
+        sheetId: '',
+        imageFile: null
     });
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     // User Management (for Admin and SuperAdmin)
     const [users, setUsers] = useState<UserData[]>([]);
@@ -275,6 +278,39 @@ export default function Admin() {
         }
 
         try {
+            setUploadingImage(true);
+
+            // อัปโหลดรูปถ้ามี
+            let finalImageUrl = newCandidate.imageUrl;
+            if (newCandidate.imageFile) {
+                console.log('🔄 กำลังอัปโหลดรูป...');
+                const timestamp = Date.now();
+                const fileName = `${newCandidate.name.replace(/\s+/g, '_')}_${timestamp}`;
+                const path = `candidates/${selectedCategory}/${fileName}`;
+                
+                try {
+                    finalImageUrl = await uploadImage(newCandidate.imageFile, path);
+                    console.log('✅ อัปโหลดรูปสำเร็จ:', finalImageUrl);
+                } catch (uploadError) {
+                    console.error('❌ อัปโหลดรูปล้มเหลว:', uploadError);
+                    setUploadingImage(false);
+                    
+                    // แสดง error message ที่เข้าใจง่าย
+                    const errorMessage = (uploadError as Error).message;
+                    if (errorMessage.includes('storage/unauthorized') || errorMessage.includes('permission')) {
+                        alert('❌ ไม่สามารถอัปโหลดรูปได้!\n\nสาเหตุ: Firebase Storage ยังไม่ได้เปิดใช้งาน หรือ Storage Rules ยังไม่ได้ deploy\n\nวิธีแก้:\n1. เปิด Firebase Storage ใน Console\n2. รอ 2-3 นาที\n3. รัน: firebase deploy --only storage');
+                    } else if (errorMessage.includes('storage-quota-exceeded')) {
+                        alert('❌ พื้นที่ Storage เต็ม! กรุณาลบไฟล์เก่าหรืออัพเกรด plan');
+                    } else if (errorMessage.includes('storage-unauthenticated')) {
+                        alert('❌ ไม่ได้ล็อกอิน! กรุณาล็อกอินใหม่');
+                    } else {
+                        alert(`❌ อัปโหลดรูปล้มเหลว!\n\nError: ${errorMessage}\n\nกรุณาตรวจสอบ:\n- Firebase Storage เปิดแล้วหรือยัง?\n- Storage Rules deploy แล้วหรือยัง?\n- ไฟล์รูปเสียหรือเปล่า?`);
+                    }
+                    return;
+                }
+            }
+
+            console.log('💾 กำลังบันทึกข้อมูลผู้สมัคร...');
             const candidatesRef = collection(db, 'candidates');
             const q = query(candidatesRef, where('category', '==', selectedCategory));
             const snapshot = await getDocs(q);
@@ -283,9 +319,11 @@ export default function Admin() {
                 return order > max ? order : max;
             }, 0);
 
-            // ✅ 3. บันทึก sheetId ลง Firebase (แปลงเป็นตัวเลข)
+            // ✅ บันทึกข้อมูลพร้อม imageUrl ที่อัปโหลดแล้ว
             await addDoc(collection(db, 'candidates'), {
-                ...newCandidate,
+                name: newCandidate.name,
+                description: newCandidate.description,
+                imageUrl: finalImageUrl,
                 sheetId: newCandidate.sheetId ? Number(newCandidate.sheetId) : null,
                 category: selectedCategory,
                 voteCount: 0,
@@ -294,13 +332,23 @@ export default function Admin() {
                 createdBy: currentUser?.uid || 'unknown'
             });
 
-            // ✅ รีเซ็ตค่าหลังจากบันทึก
-            setNewCandidate({ name: '', description: '', imageUrl: '', sheetId: '' });
+            console.log('✅ บันทึกสำเร็จ!');
+            
+            // รีเซ็ตค่า
+            setNewCandidate({ name: '', description: '', imageUrl: '', sheetId: '', imageFile: null });
             setShowAddModal(false);
+            setUploadingImage(false);
             alert('✅ เพิ่มผู้สมัครสำเร็จ');
         } catch (error) {
             console.error('❌ Failed to add candidate:', error);
-            alert('❌ เกิดข้อผิดพลาดในการเพิ่มผู้สมัคร: ' + (error as Error).message);
+            setUploadingImage(false);
+            
+            const errorMessage = (error as Error).message;
+            if (errorMessage.includes('permission-denied') || errorMessage.includes('insufficient permissions')) {
+                alert('❌ ไม่มีสิทธิ์เพิ่มผู้สมัคร!\n\nคุณต้องเป็น Admin หรือ SuperAdmin เท่านั้น');
+            } else {
+                alert('❌ เกิดข้อผิดพลาด: ' + errorMessage);
+            }
         }
     };
 
@@ -884,13 +932,38 @@ export default function Admin() {
 
             {/* Add Candidate Modal */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
-                        <h3 className="text-2xl font-bold text-gray-800 mb-4">
-                            ➕ เพิ่มผู้สมัครใหม่
-                        </h3>
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+                    <div className="bg-gradient-to-br from-white to-blue-50/30 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up">
+                        {/* Header */}
+                        <div className="sticky top-0 bg-gradient-to-r from-red-600 to-pink-600 px-6 py-4 rounded-t-3xl sm:rounded-t-3xl z-10">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                                        <span className="text-3xl">➕</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white">เพิ่มผู้สมัครใหม่</h3>
+                                        <p className="text-white/80 text-sm">{voteSettings[selectedCategory]?.title}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setShowAddModal(false);
+                                        setNewCandidate({ name: '', description: '', imageUrl: '', sheetId: '', imageFile: null });
+                                    }}
+                                    className="w-10 h-10 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl text-white transition-all active:scale-95"
+                                    disabled={uploadingImage}
+                                >
+                                    <svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
 
-                        <div className="space-y-4 mb-6">
+                        {/* Content */}
+                        <div className="p-6 space-y-5">
+                            {/* Category Select */}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-2">
                                     หมวดหมู่
@@ -898,7 +971,7 @@ export default function Admin() {
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none"
+                                    className="w-full p-4 border-2 border-gray-300 rounded-2xl focus:border-red-500 focus:outline-none bg-white text-lg font-medium"
                                 >
                                     {Object.keys(voteSettings).map(cat => (
                                         <option key={cat} value={cat}>{voteSettings[cat].title}</option>
@@ -906,7 +979,7 @@ export default function Admin() {
                                 </select>
                             </div>
 
-                            {/* ✅ 4. เพิ่มช่องกรอก Sheet ID */}
+                            {/* Sheet ID */}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-2">
                                     Sheet ID (ลำดับ ID ใน Excel) *
@@ -915,27 +988,30 @@ export default function Admin() {
                                     type="number"
                                     value={newCandidate.sheetId}
                                     onChange={(e) => setNewCandidate({ ...newCandidate, sheetId: e.target.value })}
-                                    className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none font-mono"
+                                    className="w-full p-4 border-2 border-gray-300 rounded-2xl focus:border-red-500 focus:outline-none font-mono text-lg"
                                     placeholder="เช่น 1, 2, 3..."
                                 />
-                                <p className="text-xs text-gray-500 mt-1">
-                                    * ใส่เลขให้ตรงกับ Column A ใน Google Sheet เพื่อให้ตัดคะแนนถูกคน
+                                <p className="text-xs text-gray-500 mt-2 flex items-start gap-2">
+                                    <span>ℹ️</span>
+                                    <span>ใส่เลขให้ตรงกับ Column A ใน Google Sheet เพื่อให้ซิงค์คะแนนถูกต้อง</span>
                                 </p>
                             </div>
 
+                            {/* Name */}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    ชื่อ *
+                                    ชื่อผู้สมัคร *
                                 </label>
                                 <input
                                     type="text"
                                     value={newCandidate.name}
                                     onChange={(e) => setNewCandidate({ ...newCandidate, name: e.target.value })}
-                                    className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none"
+                                    className="w-full p-4 border-2 border-gray-300 rounded-2xl focus:border-red-500 focus:outline-none text-lg"
                                     placeholder="ใส่ชื่อผู้สมัคร"
                                 />
                             </div>
 
+                            {/* Description */}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-2">
                                     คำอธิบาย *
@@ -943,42 +1019,111 @@ export default function Admin() {
                                 <textarea
                                     value={newCandidate.description}
                                     onChange={(e) => setNewCandidate({ ...newCandidate, description: e.target.value })}
-                                    className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none"
-                                    rows={3}
-                                    placeholder="ใส่คำอธิบายผู้สมัคร"
+                                    className="w-full p-4 border-2 border-gray-300 rounded-2xl focus:border-red-500 focus:outline-none resize-none text-lg"
+                                    rows={4}
+                                    placeholder="ใส่คำอธิบายผู้สมัคร..."
                                 />
                             </div>
 
+                            {/* Image Upload */}
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    URL รูปภาพ (ไม่บังคับ)
+                                <label className="block text-sm font-bold text-gray-700 mb-3">
+                                    รูปภาพผู้สมัคร
                                 </label>
+                                
+                                {/* Preview */}
+                                {(newCandidate.imageFile || newCandidate.imageUrl) && (
+                                    <div className="mb-4 relative inline-block">
+                                        <img
+                                            src={newCandidate.imageFile ? URL.createObjectURL(newCandidate.imageFile) : newCandidate.imageUrl}
+                                            alt="Preview"
+                                            className="w-40 h-40 object-cover rounded-2xl border-4 border-gray-200 shadow-lg"
+                                        />
+                                        <button
+                                            onClick={() => setNewCandidate({ ...newCandidate, imageFile: null, imageUrl: '' })}
+                                            className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all active:scale-95"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Upload Button */}
+                                <label className="block w-full py-4 px-6 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-2xl font-bold cursor-pointer transition-all shadow-lg active:scale-95">
+                                    <div className="flex items-center justify-center gap-3">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        <span className="text-lg">📸 เลือกรูปจากเครื่อง</span>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                if (file.size > 5 * 1024 * 1024) {
+                                                    alert('⚠️ ไฟล์ใหญ่เกิน 5MB กรุณาเลือกไฟล์ที่เล็กกว่า');
+                                                    return;
+                                                }
+                                                setNewCandidate({ ...newCandidate, imageFile: file, imageUrl: '' });
+                                            }
+                                        }}
+                                    />
+                                </label>
+                                <p className="text-xs text-gray-500 mt-2 text-center">รองรับ JPG, PNG, GIF (สูงสุด 5MB)</p>
+
+                                {/* Divider */}
+                                <div className="relative my-5">
+                                    <div className="absolute inset-0 flex items-center">
+                                        <div className="w-full border-t-2 border-gray-200"></div>
+                                    </div>
+                                    <div className="relative flex justify-center">
+                                        <span className="bg-white px-4 text-sm text-gray-500 font-medium">หรือใส่ URL รูปภาพ</span>
+                                    </div>
+                                </div>
+                                
+                                {/* URL Input */}
                                 <input
                                     type="text"
                                     value={newCandidate.imageUrl}
-                                    onChange={(e) => setNewCandidate({ ...newCandidate, imageUrl: e.target.value })}
-                                    className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none"
+                                    onChange={(e) => setNewCandidate({ ...newCandidate, imageUrl: e.target.value, imageFile: null })}
+                                    className="w-full p-4 border-2 border-gray-300 rounded-2xl focus:border-red-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                                     placeholder="https://..."
+                                    disabled={!!newCandidate.imageFile}
                                 />
                             </div>
-                        </div>
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowAddModal(false);
-                                    setNewCandidate({ name: '', description: '', imageUrl: '', sheetId: '' }); // ✅ รีเซ็ตค่า
-                                }}
-                                className="flex-1 py-3 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-xl font-bold transition-colors"
-                            >
-                                ยกเลิก
-                            </button>
-                            <button
-                                onClick={handleAddCandidate}
-                                className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-bold transition-all shadow-lg"
-                            >
-                                ✓ เพิ่มผู้สมัคร
-                            </button>
+                            {/* Action Buttons - Fixed at bottom on mobile */}
+                            <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-4 pb-2 -mx-6 px-6">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => {
+                                            setShowAddModal(false);
+                                            setNewCandidate({ name: '', description: '', imageUrl: '', sheetId: '', imageFile: null });
+                                        }}
+                                        className="py-4 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-2xl font-bold text-lg transition-all active:scale-95"
+                                        disabled={uploadingImage}
+                                    >
+                                        ยกเลิก
+                                    </button>
+                                    <button
+                                        onClick={handleAddCandidate}
+                                        className="py-4 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white rounded-2xl font-bold text-lg shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        disabled={uploadingImage}
+                                    >
+                                        {uploadingImage ? (
+                                            <div className="flex items-center justify-center gap-2">
+                                                <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                <span>กำลังอัปโหลด...</span>
+                                            </div>
+                                        ) : (
+                                            <span>✓ เพิ่มผู้สมัคร</span>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

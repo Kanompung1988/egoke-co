@@ -1,0 +1,54 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules for EGOKE
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is admin or superadmin
+    function isAdmin() {
+      return isAuthenticated() && 
+             (request.auth.token.role == 'admin' || 
+              request.auth.token.role == 'superadmin');
+    }
+    
+    // Candidates images
+    match /candidates/{category}/{fileName} {
+      // Anyone can read candidate images
+      allow read: if true;
+      
+      // Only admin/superadmin can upload/update/delete
+      allow write: if isAdmin();
+      
+      // Limit file size to 5MB
+      allow write: if request.resource.size < 5 * 1024 * 1024;
+      
+      // Only allow image files
+      allow write: if request.resource.contentType.matches('image/.*');
+    }
+    
+    // User profile images (optional for future use)
+    match /users/{userId}/{fileName} {
+      // User can read their own images
+      allow read: if isAuthenticated();
+      
+      // User can upload their own images
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Limit file size to 2MB
+      allow write: if request.resource.size < 2 * 1024 * 1024;
+      
+      // Only allow image files
+      allow write: if request.resource.contentType.matches('image/.*');
+    }
+    
+    // Deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

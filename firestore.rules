@@ -216,6 +216,38 @@ service cloud.firestore {
     }
 
     // ===================================
+    // VoteRightsPurchases Collection (ประวัติการซื้อสิทธิ์โหวต)
+    // ===================================
+    match /voteRightsPurchases/{purchaseId} {
+      // อ่านได้: ตัวเอง หรือ Staff ขึ้นไป
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid 
+        || isStaff()
+      );
+      
+      // สร้างได้: ระบบเท่านั้น (ผ่าน transaction)
+      allow create: if isAuthenticated() 
+        && request.resource.data.userId == request.auth.uid;
+      
+      // แก้ไข/ลบ: เฉพาะ Admin ขึ้นไป
+      allow update, delete: if isAdmin();
+    }
+
+    // ===================================
+    // ActivityLogs Collection (บันทึกกิจกรรมทั้งหมด)
+    // ===================================
+    match /activityLogs/{logId} {
+      // อ่านได้: เฉพาะ SuperAdmin
+      allow read: if isSuperAdmin();
+      
+      // สร้างได้: ทุกคนที่ login (ระบบสร้างอัตโนมัติ)
+      allow create: if isAuthenticated();
+      
+      // แก้ไข/ลบ: เฉพาะ SuperAdmin
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // ===================================
     // Default: Block All (ถ้าไม่ตรงกฎข้างบน)
     // ===================================
     match /{document=**} {

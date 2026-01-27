@@ -6,6 +6,7 @@ import { useToast } from '../components/contexts/ToastContext';
 import { doc, setDoc, Timestamp } from 'firebase/firestore';
 import { useVoteSettings } from '../hooks/useVote';
 import type { VoteCategory } from '../hooks/useVote';
+import ActivityLogsViewer from '../components/ActivityLogsViewer';
 
 interface UserData {
     uid: string;
@@ -28,7 +29,7 @@ export default function SuperAdmin() {
     const [searchQuery, setSearchQuery] = useState('');
     
     // Category Management State
-    const [activeTab, setActiveTab] = useState<'users' | 'categories'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'categories' | 'logs'>('users');
     const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
     const [editingCategory, setEditingCategory] = useState<string | null>(null);
     const [newCategory, setNewCategory] = useState({
@@ -299,7 +300,23 @@ export default function SuperAdmin() {
                         <i className="ri-list-settings-line mr-2"></i>
                         จัดการหมวดหมู่
                     </button>
+                    <button
+                        onClick={() => setActiveTab('logs')}
+                        className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
+                            activeTab === 'logs'
+                                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                    >
+                        <i className="ri-file-list-3-line mr-2"></i>
+                        Activity Logs
+                    </button>
                 </div>
+
+                {/* Activity Logs Tab */}
+                {activeTab === 'logs' && (
+                    <ActivityLogsViewer />
+                )}
 
                 {/* Users Tab */}
                 {activeTab === 'users' && (

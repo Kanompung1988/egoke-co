@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useVoteSettings, useCandidates, useUserVoteStatus, submitVote, useVoteStats } from '../hooks/useVote';
+import { 
+    useVoteSettings, 
+    useCandidates, 
+    submitVoteWithRights, 
+    useVoteStats,
+    useVoteRights,
+    useVoteHistory 
+} from '../hooks/useVote';
 import { useAuth } from '../hooks/useAuth';
 import VoteStats from '../components/VoteStats';
 import BottomNav from "../components/BottomNav";
+import PurchaseVoteRightsModal from '../components/PurchaseVoteRightsModal';
 import type { Candidate } from '../hooks/useVote';
 
 const CATEGORIES = [
@@ -20,15 +28,18 @@ export default function Vote() {
     const [showVoteSuccess, setShowVoteSuccess] = useState(false);
     const [votedCandidate, setVotedCandidate] = useState<Candidate | null>(null);
     const [notificationEnabled, setNotificationEnabled] = useState(false);
+    const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
     const { categories: voteSettings, loading: settingsLoading } = useVoteSettings();
     const { candidates, loading: candidatesLoading } = useCandidates(selectedCategory);
     const categorySettings = voteSettings[selectedCategory];
     const sessionId = categorySettings?.sessionId || 'default';
-    const { hasVoted, votedCandidateId } = useUserVoteStatus(selectedCategory, sessionId);
+    const { voteRights } = useVoteRights(currentUser?.uid);
+    const { history: voteHistory } = useVoteHistory(currentUser?.uid, selectedCategory);
     const { totalVotes } = useVoteStats(selectedCategory);
 
     const isStaff = currentUser?.role === 'staff';
+    const currentCategoryRights = voteRights[selectedCategory as keyof typeof voteRights] || 0;
 
     // ✅ ฟังก์ชันส่งคะแนนไป Google Sheet (รับ ID และ คะแนนล่าสุด)
     const syncVoteToSheet = async (sheetId: string | number, score: number) => {
@@ -101,7 +112,7 @@ export default function Vote() {
             const wasOpen = localStorage.getItem(`voteOpen_${selectedCategory}`);
             const isNowOpen = categorySettings.isOpen;
 
-            if (wasOpen === 'false' && isNowOpen && !hasVoted) {
+            if (wasOpen === 'false' && isNowOpen && currentCategoryRights > 0) {
                 // Vote just opened!
                 new Notification('🎉 เปิดให้โหวตแล้ว!', {
                     body: `หมวด ${CATEGORIES.find(c => c.id === selectedCategory)?.name} เปิดให้โหวตแล้ว`,
@@ -113,20 +124,29 @@ export default function Vote() {
 
             localStorage.setItem(`voteOpen_${selectedCategory}`, isNowOpen.toString());
         }
-    }, [categorySettings?.isOpen, selectedCategory, settingsLoading, notificationEnabled, hasVoted]);
+    }, [categorySettings?.isOpen, selectedCategory, settingsLoading, notificationEnabled, currentCategoryRights]);
 
-    // Find voted candidate for display
+    // Find last voted candidate for display (get most recent from history)
     useEffect(() => {
-        if (hasVoted && votedCandidateId) {
-            const voted = candidates.find(c => c.id === votedCandidateId);
+        if (voteHistory.length > 0) {
+            const lastVote = voteHistory[voteHistory.length - 1];
+            const voted = candidates.find(c => c.id === lastVote.candidateId);
             if (voted) {
                 setVotedCandidate(voted);
             }
         }
-    }, [hasVoted, votedCandidateId, candidates]);
+    }, [voteHistory, candidates]);
 
     const handleVoteClick = (candidate: Candidate) => {
-        if (!hasVoted && categorySettings?.isOpen) {
+        // Check if user has vote rights
+        if (currentCategoryRights <= 0) {
+            if (confirm('คุณไม่มีสิทธิ์โหวตในหมวดนี้แล้ว\n\nต้องการซื้อสิทธิ์เพิ่มหรือไม่?')) {
+                setShowPurchaseModal(true);
+            }
+            return;
+        }
+
+        if (categorySettings?.isOpen) {
             setSelectedCandidate(candidate);
             setShowConfirmModal(true);
         }
@@ -137,14 +157,26 @@ export default function Vote() {
 
         setVotingInProgress(true);
         try {
-            const result = await submitVote(selectedCategory, sessionId, selectedCandidate);
+            const result = await submitVoteWithRights(
+                currentUser.uid,
+                currentUser.email || '',
+                currentUser.displayName || 'Anonymous',
+                selectedCandidate.id,
+                selectedCategory,
+                sessionId
+            );
 
             if (result.success) {
                 setShowConfirmModal(false);
                 setVotedCandidate(selectedCandidate);
                 setShowVoteSuccess(true);
+
+                // Sync to Google Sheets if available
+                if (selectedCandidate.sheetId) {
+                    await syncVoteToSheet(selectedCandidate.sheetId, selectedCandidate.voteCount + 1);
+                }
             } else {
-                alert(result.error || 'เกิดข้อผิดพลาดในการโหวต');
+                alert(result.message || 'เกิดข้อผิดพลาดในการโหวต');
             }
         } catch (error) {
             console.error('Failed to submit vote:', error);
@@ -278,15 +310,44 @@ export default function Vote() {
                         </div>
 
                         <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.4s' }}>
+                            {/* ปุ่มโหวตต่อ */}
                             <button
                                 onClick={() => setShowVoteSuccess(false)}
-                                className="w-full bg-gradient-to-r from-red-600 via-red-700 to-amber-600 hover:from-red-700 hover:via-red-800 hover:to-amber-700 text-white py-4 rounded-2xl font-bold shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-4 rounded-2xl font-bold shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
                             >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                </svg>
-                                <span>ดูผลโหวตทั้งหมด</span>
+                                <span className="text-2xl">🎫</span>
+                                <span>โหวตต่อ ({currentCategoryRights} สิทธิ์คงเหลือ)</span>
                             </button>
+
+                            {/* ปุ่มซื้อสิทธิ์เพิ่ม */}
+                            {currentCategoryRights === 0 && (
+                                <button
+                                    onClick={() => {
+                                        setShowVoteSuccess(false);
+                                        setShowPurchaseModal(true);
+                                    }}
+                                    className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white py-4 rounded-2xl font-bold shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                    <span className="text-2xl">🛒</span>
+                                    <span>ซื้อสิทธิ์โหวตเพิ่ม (15 แต้ม/สิทธิ์)</span>
+                                </button>
+                            )}
+
+                            {/* ปุ่มดูผลโหวต - แสดงเฉพาะ Staff/Admin หรือเมื่อปิดโหวต */}
+                            {(isStaff || !isOpen) && (
+                                <button
+                                    onClick={() => {
+                                        setShowVoteSuccess(false);
+                                        window.location.href = '/vote-results';
+                                    }}
+                                    className="w-full bg-gradient-to-r from-red-600 via-red-700 to-amber-600 hover:from-red-700 hover:via-red-800 hover:to-amber-700 text-white py-4 rounded-2xl font-bold shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                    <span>ดูผลโหวตทั้งหมด</span>
+                                </button>
+                            )}
 
                             {isStaff && (
                                 <button
@@ -378,8 +439,79 @@ export default function Vote() {
                         </div>
                     )}
 
+                    {/* Vote Rights Info Card - Show when voting is closed */}
+                    {!isOpen && (
+                        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl mb-4 animate-fade-in overflow-hidden border-2 border-blue-100">
+                            {/* Header */}
+                            <div className="bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-50 px-6 py-8 text-center border-b border-blue-100">
+                                <div className="relative inline-block mb-4">
+                                    <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-100 to-cyan-100 rounded-3xl flex items-center justify-center shadow-xl">
+                                        <span className="text-5xl">🎫</span>
+                                    </div>
+                                </div>
+                                <h3 className="text-3xl font-bold bg-gradient-to-r from-blue-700 to-cyan-700 bg-clip-text text-transparent mb-2">
+                                    สิทธิ์โหวตของคุณ
+                                </h3>
+                                <p className="text-gray-600 text-sm">
+                                    หมวด {CATEGORIES.find(c => c.id === selectedCategory)?.name}
+                                </p>
+                            </div>
+
+                            {/* Vote Rights Display */}
+                            <div className="px-6 py-6">
+                                <div className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl p-6 text-white text-center mb-4">
+                                    <div className="text-sm opacity-90 mb-2">สิทธิ์โหวตคงเหลือ</div>
+                                    <div className="text-6xl font-bold mb-2">{currentCategoryRights}</div>
+                                    <div className="text-sm opacity-90">ครั้ง</div>
+                                </div>
+
+                                {/* Vote History */}
+                                {voteHistory.length > 0 && (
+                                    <div className="mb-4">
+                                        <h4 className="font-bold text-gray-700 mb-3">ประวัติการโหวต ({voteHistory.length} ครั้ง)</h4>
+                                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                                            {voteHistory.slice().reverse().map((vote, idx) => (
+                                                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-2xl">{vote.voteType === 'free' ? '🆓' : '🎫'}</span>
+                                                        <div>
+                                                            <div className="font-semibold text-sm">{vote.candidateName}</div>
+                                                            <div className="text-xs text-gray-500">
+                                                                {vote.voteType === 'free' ? 'โหวตฟรี' : 'ใช้สิทธิ์ที่ซื้อ'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-xs text-gray-400">
+                                                        {vote.votedAt?.toDate?.()?.toLocaleString('th-TH', { 
+                                                            month: 'short', 
+                                                            day: 'numeric',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Purchase Button */}
+                                <button
+                                    onClick={() => setShowPurchaseModal(true)}
+                                    className="w-full py-4 rounded-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                    <span className="text-2xl">🛒</span>
+                                    <span>ซื้อสิทธิ์โหวตเพิ่ม</span>
+                                </button>
+                                <p className="text-center text-sm text-gray-500 mt-2">
+                                    15 แต้ม = 1 สิทธิ์โหวต
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Status Info - Beautiful Coming Soon Modal */}
-                    {!isOpen && !hasVoted && (
+                    {!isOpen && currentCategoryRights > 0 && (
                         <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl mb-4 animate-fade-in overflow-hidden border-2 border-red-100">
                             {/* Header with gradient */}
                             <div className="bg-gradient-to-br from-red-50 via-amber-50 to-red-50 px-6 py-8 text-center border-b border-red-100">
@@ -458,21 +590,21 @@ export default function Vote() {
                         </div>
                     )}
 
-                    {/* Already Voted - Beautiful Modal */}
-                    {!isOpen && hasVoted && (
-                        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl mb-4 animate-fade-in overflow-hidden border-2 border-amber-100">
+                    {/* Vote Rights Info - Replace "Already Voted" section */}
+                    {!isOpen && (
+                        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl mb-4 animate-fade-in overflow-hidden border-2 border-blue-100">
                             {/* Header */}
-                            <div className="bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-50 px-6 py-8 text-center border-b border-amber-100">
+                            <div className="bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-50 px-6 py-8 text-center border-b border-blue-100">
                                 <div className="relative inline-block mb-4">
-                                    <div className="w-20 h-20 mx-auto bg-gradient-to-br from-amber-100 to-yellow-100 rounded-3xl flex items-center justify-center shadow-xl">
-                                        <span className="text-5xl">🎉</span>
+                                    <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-100 to-cyan-100 rounded-3xl flex items-center justify-center shadow-xl">
+                                        <span className="text-5xl">�</span>
                                     </div>
                                 </div>
-                                <h3 className="text-3xl font-bold bg-gradient-to-r from-amber-700 to-yellow-700 bg-clip-text text-transparent mb-2">
-                                    ขอบคุณที่โหวต!
+                                <h3 className="text-3xl font-bold bg-gradient-to-r from-blue-700 to-cyan-700 bg-clip-text text-transparent mb-2">
+                                    สิทธิ์โหวตของคุณ
                                 </h3>
                                 <p className="text-gray-600 text-sm">
-                                    คุณได้ทำการโหวตเรียบร้อยแล้ว
+                                    คุณมีสิทธิ์โหวต {currentCategoryRights} ครั้ง ในหมวดนี้
                                 </p>
                             </div>
 
@@ -556,13 +688,6 @@ export default function Vote() {
                                             </div>
                                         )}
 
-                                        {/* Voted Badge */}
-                                        {votedCandidateId === candidate.id && (
-                                            <div className="absolute top-3 right-3 bg-amber-400 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg animate-pulse">
-                                                ✓ คุณโหวตให้
-                                            </div>
-                                        )}
-
                                         {/* Vote Count Badge - Only for Staff */}
                                         {isStaff && (
                                             <div className="absolute top-3 left-3 bg-red-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
@@ -581,20 +706,20 @@ export default function Vote() {
                                         </p>
 
                                         {/* Vote Button */}
-                                        {!hasVoted ? (
+                                        {currentCategoryRights > 0 ? (
                                             <button
                                                 onClick={() => handleVoteClick(candidate)}
                                                 className="w-full py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
                                             >
-                                                🗳️ โหวตให้
+                                                🗳️ โหวตให้ ({currentCategoryRights} สิทธิ์)
                                             </button>
                                         ) : (
-                                            <div className={`w-full py-3 rounded-xl font-bold text-center ${votedCandidateId === candidate.id
-                                                ? 'bg-amber-400 text-white'
-                                                : 'bg-gray-300 text-gray-500'
-                                                }`}>
-                                                {votedCandidateId === candidate.id ? '✓ โหวตแล้ว' : 'คุณโหวตคนอื่นแล้ว'}
-                                            </div>
+                                            <button
+                                                onClick={() => setShowPurchaseModal(true)}
+                                                className="w-full py-3 rounded-xl font-bold text-center bg-blue-500 hover:bg-blue-600 text-white transition-all active:scale-95"
+                                            >
+                                                🛒 ซื้อสิทธิ์โหวต
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -699,6 +824,23 @@ export default function Vote() {
                     </div>
                 </div>
             </div>
+
+            {/* Purchase Vote Rights Modal */}
+            {currentUser && (
+                <PurchaseVoteRightsModal
+                    isOpen={showPurchaseModal}
+                    onClose={() => setShowPurchaseModal(false)}
+                    userId={currentUser.uid}
+                    userEmail={currentUser.email || ''}
+                    userName={currentUser.displayName || 'Anonymous'}
+                    category={selectedCategory as 'band' | 'solo' | 'cover'}
+                    currentPoints={currentUser.points || 0}
+                    currentRights={currentCategoryRights}
+                    onSuccess={() => {
+                        // Modal will close automatically, rights will update via real-time listener
+                    }}
+                />
+            )}
 
             <BottomNav />
         </div>

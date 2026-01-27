@@ -1249,3 +1249,30 @@
 .glow-orb-1 { top: 10%; left: 5%; animation-delay: 0s; }
 .glow-orb-2 { top: 60%; right: 5%; animation-delay: 2s; }
 .glow-orb-3 { bottom: 10%; left: 50%; animation-delay: 1s; }
+
+/* Slide Up Animation for Mobile Modals */
+@keyframes slide-up {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.animate-slide-up {
+    animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Shake Animation for Warnings */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+    20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+    animation: shake 0.5s ease-in-out;
+}

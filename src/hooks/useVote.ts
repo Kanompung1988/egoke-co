@@ -3,18 +3,20 @@ import {
     collection, 
     doc, 
     getDoc, 
-    getDocs, 
-    setDoc, 
-    updateDoc, 
     increment, 
     query, 
     where, 
     onSnapshot, 
     Timestamp,
     writeBatch, 
-    serverTimestamp 
+    serverTimestamp,
+    runTransaction,
+    orderBy,
+    limit
 } from 'firebase/firestore';
 import { db, auth } from '../firebaseApp';
+import type { VoteRights, VoteRightsPurchase, UserVoteRecord } from '../types/voteRights';
+import { logVoteCast, logVoteRightsPurchase } from '../utils/activityLogger';
 
 export interface VoteCategory {
     id: string;
@@ -322,4 +324,361 @@ export function useRealTimeVoteCount(category: string, sessionId: string) {
     }, [category, sessionId]);
 
     return { voteCount, voters };
+}
+
+// ===================================
+// Vote Rights Hooks
+// ===================================
+
+/**
+ * Hook to get user's vote rights for each category
+ */
+export function useVoteRights(userId: string | undefined) {
+    const [voteRights, setVoteRights] = useState<VoteRights>({ band: 1, solo: 1, cover: 1 });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!userId) {
+            setLoading(false);
+            return;
+        }
+
+        const userDocRef = doc(db, 'users', userId);
+        
+        const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data();
+                setVoteRights(data.voteRights || { band: 1, solo: 1, cover: 1 });
+            } else {
+                setVoteRights({ band: 1, solo: 1, cover: 1 });
+            }
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [userId]);
+
+    return { voteRights, loading };
+}
+
+/**
+ * Purchase vote rights for a specific category
+ */
+export async function purchaseVoteRights(
+    userId: string,
+    userEmail: string,
+    userName: string,
+    category: 'band' | 'solo' | 'cover',
+    rightsAmount: number
+): Promise<{ success: boolean; message: string }> {
+    if (!userId || !category || rightsAmount <= 0) {
+        return { success: false, message: 'ข้อมูลไม่ถูกต้อง' };
+    }
+
+    const POINTS_PER_RIGHT = 15;
+    const totalCost = rightsAmount * POINTS_PER_RIGHT;
+
+    try {
+        const result = await runTransaction(db, async (transaction) => {
+            const userRef = doc(db, 'users', userId);
+            const userDoc = await transaction.get(userRef);
+
+            if (!userDoc.exists()) {
+                throw new Error('ไม่พบข้อมูลผู้ใช้');
+            }
+
+            const userData = userDoc.data();
+            const currentPoints = userData.points || 0;
+            const currentRights = userData.voteRights || { band: 1, solo: 1, cover: 1 };
+
+            if (currentPoints < totalCost) {
+                throw new Error(`แต้มไม่เพียงพอ (ต้องการ ${totalCost} แต้ม, มีอยู่ ${currentPoints} แต้ม)`);
+            }
+
+            const newPoints = currentPoints - totalCost;
+            const newRights = {
+                ...currentRights,
+                [category]: (currentRights[category] || 1) + rightsAmount
+            };
+
+            // Update user document
+            transaction.update(userRef, {
+                points: newPoints,
+                voteRights: newRights,
+                updatedAt: serverTimestamp()
+            });
+
+            // Create purchase record
+            const purchaseRef = doc(collection(db, 'voteRightsPurchases'));
+            const purchase: Omit<VoteRightsPurchase, 'id'> = {
+                userId,
+                userEmail,
+                userName,
+                category,
+                rightsAmount,
+                pointsSpent: totalCost,
+                pointsBefore: currentPoints,
+                pointsAfter: newPoints,
+                purchasedAt: serverTimestamp() as Timestamp
+            };
+            transaction.set(purchaseRef, purchase);
+
+            return { pointsBefore: currentPoints, pointsAfter: newPoints };
+        });
+
+        // Log activity after successful transaction
+        await logVoteRightsPurchase(
+            userId,
+            userEmail,
+            userName,
+            category,
+            rightsAmount,
+            result.pointsBefore,
+            result.pointsAfter
+        );
+
+        return { 
+            success: true, 
+            message: `ซื้อสิทธิ์โหวต ${rightsAmount} ครั้ง สำเร็จ (ใช้ ${totalCost} แต้ม)` 
+        };
+    } catch (error) {
+        console.error('Error purchasing vote rights:', error);
+        return { 
+            success: false, 
+            message: error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการซื้อสิทธิ์โหวต' 
+        };
+    }
+}
+
+/**
+ * Modified submit vote to use vote rights instead of checking hasVoted
+ */
+export async function submitVoteWithRights(
+    userId: string,
+    userEmail: string,
+    userName: string,
+    candidateId: string,
+    category: string,
+    sessionId: string
+): Promise<{ success: boolean; message: string }> {
+    if (!userId || !candidateId || !category || !sessionId) {
+        return { success: false, message: 'ข้อมูลไม่ถูกต้อง' };
+    }
+
+    try {
+        const result = await runTransaction(db, async (transaction) => {
+            const userRef = doc(db, 'users', userId);
+            const candidateRef = doc(db, 'candidates', candidateId);
+            
+            const userDoc = await transaction.get(userRef);
+            const candidateDoc = await transaction.get(candidateRef);
+
+            if (!userDoc.exists()) {
+                throw new Error('ไม่พบข้อมูลผู้ใช้');
+            }
+
+            if (!candidateDoc.exists()) {
+                throw new Error('ไม่พบข้อมูลผู้สมัคร');
+            }
+
+            const userData = userDoc.data();
+            const candidateData = candidateDoc.data();
+            const currentRights = userData.voteRights || { band: 1, solo: 1, cover: 1 };
+
+            // Check if user has vote rights for this category
+            if (!currentRights[category] || currentRights[category] <= 0) {
+                throw new Error('คุณไม่มีสิทธิ์โหวตในหมวดนี้แล้ว กรุณาซื้อสิทธิ์เพิ่ม');
+            }
+
+            // Determine if this is a free vote or purchased vote
+            const isFirstVote = !userData.voteHistory || 
+                                !userData.voteHistory[category] || 
+                                userData.voteHistory[category].length === 0;
+            const voteType: 'free' | 'purchased' = isFirstVote ? 'free' : 'purchased';
+
+            // Deduct vote right
+            const newRights = {
+                ...currentRights,
+                [category]: currentRights[category] - 1
+            };
+
+            // Update vote history
+            const voteHistory = userData.voteHistory || {};
+            const categoryHistory = voteHistory[category] || [];
+            categoryHistory.push({
+                candidateId,
+                candidateName: candidateData.name,
+                votedAt: new Date(),
+                voteType
+            });
+
+            // Update user document
+            transaction.update(userRef, {
+                voteRights: newRights,
+                [`voteHistory.${category}`]: categoryHistory,
+                updatedAt: serverTimestamp()
+            });
+
+            // Increment candidate vote count
+            transaction.update(candidateRef, {
+                voteCount: increment(1),
+                updatedAt: serverTimestamp()
+            });
+
+            // Create vote record
+            const voteRecordRef = doc(collection(db, 'votes'));
+            const voteRecord: Omit<UserVoteRecord, 'id'> = {
+                userId,
+                userEmail,
+                userName,
+                category: category as 'band' | 'solo' | 'cover',
+                candidateId,
+                candidateName: candidateData.name,
+                voteType,
+                votedAt: serverTimestamp() as Timestamp
+            };
+            transaction.set(voteRecordRef, voteRecord);
+
+            return {
+                candidateName: candidateData.name,
+                voteType,
+                points: userData.points || 0
+            };
+        });
+
+        // Log activity after successful vote
+        await logVoteCast(
+            userId,
+            userEmail,
+            userName,
+            category as 'band' | 'solo' | 'cover',
+            candidateId,
+            result.candidateName,
+            result.voteType,
+            result.points
+        );
+
+        return {
+            success: true,
+            message: `โหวตให้ ${result.candidateName} สำเร็จ!`
+        };
+    } catch (error) {
+        console.error('Error submitting vote:', error);
+        return {
+            success: false,
+            message: error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการโหวต'
+        };
+    }
+}
+
+/**
+ * Get user's vote history for a category
+ */
+export function useVoteHistory(userId: string | undefined, category: string) {
+    const [history, setHistory] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!userId || !category) {
+            setLoading(false);
+            return;
+        }
+
+        const userRef = doc(db, 'users', userId);
+
+        const unsubscribe = onSnapshot(userRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data();
+                const voteHistory = data.voteHistory?.[category] || [];
+                setHistory(voteHistory);
+            } else {
+                setHistory([]);
+            }
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [userId, category]);
+
+    return { history, loading };
+}
+
+/**
+ * Get purchase history for a user
+ */
+export function usePurchaseHistory(userId: string | undefined) {
+    const [purchases, setPurchases] = useState<VoteRightsPurchase[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!userId) {
+            setLoading(false);
+            return;
+        }
+
+        const purchasesRef = collection(db, 'voteRightsPurchases');
+        const q = query(purchasesRef, where('userId', '==', userId));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const purchaseData = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as VoteRightsPurchase[];
+            
+            setPurchases(purchaseData.sort((a, b) => 
+                b.purchasedAt.toMillis() - a.purchasedAt.toMillis()
+            ));
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [userId]);
+
+    return { purchases, loading };
+}
+
+/**
+ * Get all activity logs (SuperAdmin only)
+ */
+export function useActivityLogs(limitCount?: number) {
+    const [logs, setLogs] = useState<import('../types/voteRights').ActivityLog[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        try {
+            const logsRef = collection(db, 'activityLogs');
+            
+            // Build query with proper ordering
+            const q = limitCount 
+                ? query(logsRef, orderBy('timestamp', 'desc'), limit(limitCount))
+                : query(logsRef, orderBy('timestamp', 'desc'));
+
+            const unsubscribe = onSnapshot(q, 
+                (snapshot) => {
+                    const logsData = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    })) as import('../types/voteRights').ActivityLog[];
+                    
+                    setLogs(logsData);
+                    setLoading(false);
+                    setError(null);
+                },
+                (err) => {
+                    console.error('Error fetching activity logs:', err);
+                    setError(err.message);
+                    setLoading(false);
+                }
+            );
+
+            return () => unsubscribe();
+        } catch (err) {
+            console.error('Error setting up activity logs listener:', err);
+            setError(err instanceof Error ? err.message : 'Unknown error');
+            setLoading(false);
+        }
+    }, [limitCount]);
+
+    return { logs, loading, error };
 }
