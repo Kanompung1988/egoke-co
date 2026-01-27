@@ -284,12 +284,34 @@ export default function Admin() {
             let finalImageUrl = newCandidate.imageUrl;
             if (newCandidate.imageFile) {
                 console.log('🔄 กำลังอัปโหลดรูป...');
+                
+                // ✅ เช็คขนาดไฟล์ก่อนอัปโหลด
+                const fileSizeMB = newCandidate.imageFile.size / (1024 * 1024);
+                if (fileSizeMB > 5) {
+                    setUploadingImage(false);
+                    alert(`❌ ไฟล์รูปใหญ่เกินไป!\n\nขนาด: ${fileSizeMB.toFixed(2)} MB\nสูงสุด: 5 MB\n\nกรุณาลดขนาดไฟล์ก่อนอัปโหลด`);
+                    return;
+                }
+
+                // ✅ เช็คชนิดไฟล์
+                if (!newCandidate.imageFile.type.startsWith('image/')) {
+                    setUploadingImage(false);
+                    alert('❌ ไฟล์ต้องเป็นรูปภาพเท่านั้น! (JPG, PNG, GIF)');
+                    return;
+                }
+
                 const timestamp = Date.now();
                 const fileName = `${newCandidate.name.replace(/\s+/g, '_')}_${timestamp}`;
                 const path = `candidates/${selectedCategory}/${fileName}`;
                 
                 try {
-                    finalImageUrl = await uploadImage(newCandidate.imageFile, path);
+                    // ✅ ใช้ Promise.race เพื่อให้มี timeout 30 วินาที
+                    const uploadPromise = uploadImage(newCandidate.imageFile, path);
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('timeout')), 30000)
+                    );
+                    
+                    finalImageUrl = await Promise.race([uploadPromise, timeoutPromise]) as string;
                     console.log('✅ อัปโหลดรูปสำเร็จ:', finalImageUrl);
                 } catch (uploadError) {
                     console.error('❌ อัปโหลดรูปล้มเหลว:', uploadError);
@@ -297,14 +319,17 @@ export default function Admin() {
                     
                     // แสดง error message ที่เข้าใจง่าย
                     const errorMessage = (uploadError as Error).message;
-                    if (errorMessage.includes('storage/unauthorized') || errorMessage.includes('permission')) {
-                        alert('❌ ไม่สามารถอัปโหลดรูปได้!\n\nสาเหตุ: Firebase Storage ยังไม่ได้เปิดใช้งาน หรือ Storage Rules ยังไม่ได้ deploy\n\nวิธีแก้:\n1. เปิด Firebase Storage ใน Console\n2. รอ 2-3 นาที\n3. รัน: firebase deploy --only storage');
+                    
+                    if (errorMessage === 'timeout') {
+                        alert('❌ อัปโหลดรูปใช้เวลานานเกินไป!\n\nสาเหตุเป็นได้:\n- อินเทอร์เน็ตช้า\n- ไฟล์รูปใหญ่เกินไป\n- Firebase Storage มีปัญหา\n\nลองอีกครั้งหรือใช้รูปเล็กกว่านี้');
+                    } else if (errorMessage.includes('storage/unauthorized') || errorMessage.includes('permission')) {
+                        alert('❌ ไม่สามารถอัปโหลดรูปได้!\n\nสาเหตุ: Firebase Storage Rules ไม่อนุญาต\n\nแก้ไข:\n1. เช็ค Console ว่าคุณเป็น Admin/SuperAdmin หรือไม่\n2. รอ 1-2 นาทีแล้วลองใหม่\n3. Logout แล้ว Login ใหม่');
                     } else if (errorMessage.includes('storage-quota-exceeded')) {
                         alert('❌ พื้นที่ Storage เต็ม! กรุณาลบไฟล์เก่าหรืออัพเกรด plan');
                     } else if (errorMessage.includes('storage-unauthenticated')) {
                         alert('❌ ไม่ได้ล็อกอิน! กรุณาล็อกอินใหม่');
                     } else {
-                        alert(`❌ อัปโหลดรูปล้มเหลว!\n\nError: ${errorMessage}\n\nกรุณาตรวจสอบ:\n- Firebase Storage เปิดแล้วหรือยัง?\n- Storage Rules deploy แล้วหรือยัง?\n- ไฟล์รูปเสียหรือเปล่า?`);
+                        alert(`❌ อัปโหลดรูปล้มเหลว!\n\nError: ${errorMessage}\n\nลอง:\n1. รีเฟรชหน้าเว็บ\n2. ลองใช้รูปอื่น\n3. Logout แล้ว Login ใหม่`);
                     }
                     return;
                 }
