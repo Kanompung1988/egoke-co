@@ -932,26 +932,28 @@ export default function Admin() {
 
             {/* Add Candidate Modal */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-                    <div className="bg-gradient-to-br from-white to-blue-50/30 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up">
-                        {/* Header */}
-                        <div className="sticky top-0 bg-gradient-to-r from-red-600 to-pink-600 px-6 py-4 rounded-t-3xl sm:rounded-t-3xl z-10">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+                    <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl animate-slide-up border-t-4 border-amber-400">
+                        {/* Header - ธีมแดงทอง */}
+                        <div className="sticky top-0 bg-gradient-to-r from-red-500 via-red-600 to-amber-500 px-6 py-5 z-10">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-                                        <span className="text-3xl">➕</span>
+                                    <div className="w-12 h-12 bg-white/90 rounded-2xl flex items-center justify-center shadow-lg">
+                                        <span className="text-3xl">✨</span>
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-bold text-white">เพิ่มผู้สมัครใหม่</h3>
-                                        <p className="text-white/80 text-sm">{voteSettings[selectedCategory]?.title}</p>
+                                        <h3 className="text-xl font-bold text-white drop-shadow-md">เพิ่มผู้สมัครใหม่</h3>
+                                        <p className="text-white/90 text-sm font-medium">{voteSettings[selectedCategory]?.title}</p>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => {
-                                        setShowAddModal(false);
-                                        setNewCandidate({ name: '', description: '', imageUrl: '', sheetId: '', imageFile: null });
+                                        if (!uploadingImage) {
+                                            setShowAddModal(false);
+                                            setNewCandidate({ name: '', description: '', imageUrl: '', sheetId: '', imageFile: null });
+                                        }
                                     }}
-                                    className="w-10 h-10 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl text-white transition-all active:scale-95"
+                                    className="w-10 h-10 bg-white/90 hover:bg-white rounded-xl text-red-600 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                                     disabled={uploadingImage}
                                 >
                                     <svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -961,17 +963,19 @@ export default function Admin() {
                             </div>
                         </div>
 
-                        {/* Content */}
-                        <div className="p-6 space-y-5">
+                        {/* Content - Scrollable Area */}
+                        <div className="overflow-y-auto max-h-[calc(90vh-80px)] p-6 space-y-5 bg-gradient-to-br from-amber-50/30 via-white to-red-50/30">
                             {/* Category Select */}
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                                    <span className="text-xl">📂</span>
                                     หมวดหมู่
                                 </label>
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="w-full p-4 border-2 border-gray-300 rounded-2xl focus:border-red-500 focus:outline-none bg-white text-lg font-medium"
+                                    disabled={uploadingImage}
+                                    className="w-full p-4 border-2 border-amber-200 rounded-2xl focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-none bg-white text-lg font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {Object.keys(voteSettings).map(cat => (
                                         <option key={cat} value={cat}>{voteSettings[cat].title}</option>
@@ -981,53 +985,60 @@ export default function Admin() {
 
                             {/* Sheet ID */}
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                                    <span className="text-xl">🔢</span>
                                     Sheet ID (ลำดับ ID ใน Excel) *
                                 </label>
                                 <input
                                     type="number"
                                     value={newCandidate.sheetId}
                                     onChange={(e) => setNewCandidate({ ...newCandidate, sheetId: e.target.value })}
-                                    className="w-full p-4 border-2 border-gray-300 rounded-2xl focus:border-red-500 focus:outline-none font-mono text-lg"
+                                    disabled={uploadingImage}
+                                    className="w-full p-4 border-2 border-amber-200 rounded-2xl focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-none font-mono text-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     placeholder="เช่น 1, 2, 3..."
                                 />
-                                <p className="text-xs text-gray-500 mt-2 flex items-start gap-2">
-                                    <span>ℹ️</span>
+                                <p className="text-xs text-gray-600 mt-2 flex items-start gap-2 bg-blue-50 p-3 rounded-xl border border-blue-100">
+                                    <span>💡</span>
                                     <span>ใส่เลขให้ตรงกับ Column A ใน Google Sheet เพื่อให้ซิงค์คะแนนถูกต้อง</span>
                                 </p>
                             </div>
 
                             {/* Name */}
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                                    <span className="text-xl">👤</span>
                                     ชื่อผู้สมัคร *
                                 </label>
                                 <input
                                     type="text"
                                     value={newCandidate.name}
                                     onChange={(e) => setNewCandidate({ ...newCandidate, name: e.target.value })}
-                                    className="w-full p-4 border-2 border-gray-300 rounded-2xl focus:border-red-500 focus:outline-none text-lg"
+                                    disabled={uploadingImage}
+                                    className="w-full p-4 border-2 border-amber-200 rounded-2xl focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-none text-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     placeholder="ใส่ชื่อผู้สมัคร"
                                 />
                             </div>
 
                             {/* Description */}
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                                    <span className="text-xl">📝</span>
                                     คำอธิบาย *
                                 </label>
                                 <textarea
                                     value={newCandidate.description}
                                     onChange={(e) => setNewCandidate({ ...newCandidate, description: e.target.value })}
-                                    className="w-full p-4 border-2 border-gray-300 rounded-2xl focus:border-red-500 focus:outline-none resize-none text-lg"
+                                    disabled={uploadingImage}
+                                    className="w-full p-4 border-2 border-amber-200 rounded-2xl focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-none resize-none text-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     rows={4}
                                     placeholder="ใส่คำอธิบายผู้สมัคร..."
                                 />
                             </div>
 
                             {/* Image Upload */}
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-3">
+                            <div className="bg-white p-5 rounded-2xl border-2 border-amber-100 shadow-sm">
+                                <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                    <span className="text-xl">📸</span>
                                     รูปภาพผู้สมัคร
                                 </label>
                                 
@@ -1037,11 +1048,12 @@ export default function Admin() {
                                         <img
                                             src={newCandidate.imageFile ? URL.createObjectURL(newCandidate.imageFile) : newCandidate.imageUrl}
                                             alt="Preview"
-                                            className="w-40 h-40 object-cover rounded-2xl border-4 border-gray-200 shadow-lg"
+                                            className="w-40 h-40 object-cover rounded-2xl border-4 border-amber-200 shadow-lg"
                                         />
                                         <button
                                             onClick={() => setNewCandidate({ ...newCandidate, imageFile: null, imageUrl: '' })}
-                                            className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all active:scale-95"
+                                            disabled={uploadingImage}
+                                            className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             ×
                                         </button>
@@ -1049,17 +1061,34 @@ export default function Admin() {
                                 )}
 
                                 {/* Upload Button */}
-                                <label className="block w-full py-4 px-6 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-2xl font-bold cursor-pointer transition-all shadow-lg active:scale-95">
+                                <label className={`block w-full py-4 px-6 rounded-2xl font-bold cursor-pointer transition-all shadow-md active:scale-[0.98] ${
+                                    uploadingImage 
+                                        ? 'bg-gray-300 cursor-not-allowed' 
+                                        : 'bg-gradient-to-r from-amber-400 via-amber-500 to-red-500 hover:from-amber-500 hover:via-amber-600 hover:to-red-600 text-white'
+                                }`}>
                                     <div className="flex items-center justify-center gap-3">
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                        <span className="text-lg">📸 เลือกรูปจากเครื่อง</span>
+                                        {uploadingImage ? (
+                                            <>
+                                                <svg className="animate-spin h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                <span className="text-lg text-gray-600">กำลังอัปโหลด...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                <span className="text-lg">✨ เลือกรูปจากเครื่อง</span>
+                                            </>
+                                        )}
                                     </div>
                                     <input
                                         type="file"
                                         accept="image/*"
                                         className="hidden"
+                                        disabled={uploadingImage}
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (file) {
@@ -1072,15 +1101,15 @@ export default function Admin() {
                                         }}
                                     />
                                 </label>
-                                <p className="text-xs text-gray-500 mt-2 text-center">รองรับ JPG, PNG, GIF (สูงสุด 5MB)</p>
+                                <p className="text-xs text-gray-600 mt-2 text-center">รองรับ JPG, PNG, GIF (สูงสุด 5MB)</p>
 
                                 {/* Divider */}
                                 <div className="relative my-5">
                                     <div className="absolute inset-0 flex items-center">
-                                        <div className="w-full border-t-2 border-gray-200"></div>
+                                        <div className="w-full border-t-2 border-amber-100"></div>
                                     </div>
                                     <div className="relative flex justify-center">
-                                        <span className="bg-white px-4 text-sm text-gray-500 font-medium">หรือใส่ URL รูปภาพ</span>
+                                        <span className="bg-white px-4 text-sm text-gray-600 font-medium">หรือใส่ URL รูปภาพ</span>
                                     </div>
                                 </div>
                                 
@@ -1089,37 +1118,45 @@ export default function Admin() {
                                     type="text"
                                     value={newCandidate.imageUrl}
                                     onChange={(e) => setNewCandidate({ ...newCandidate, imageUrl: e.target.value, imageFile: null })}
-                                    className="w-full p-4 border-2 border-gray-300 rounded-2xl focus:border-red-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                    placeholder="https://..."
-                                    disabled={!!newCandidate.imageFile}
+                                    disabled={!!newCandidate.imageFile || uploadingImage}
+                                    className="w-full p-4 border-2 border-amber-200 rounded-2xl focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
+                                    placeholder="https://example.com/image.jpg"
                                 />
                             </div>
 
                             {/* Action Buttons - Fixed at bottom on mobile */}
-                            <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-4 pb-2 -mx-6 px-6">
+                            <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-6 pb-2 -mx-6 px-6 mt-6">
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
                                         onClick={() => {
-                                            setShowAddModal(false);
-                                            setNewCandidate({ name: '', description: '', imageUrl: '', sheetId: '', imageFile: null });
+                                            if (!uploadingImage) {
+                                                setShowAddModal(false);
+                                                setNewCandidate({ name: '', description: '', imageUrl: '', sheetId: '', imageFile: null });
+                                            }
                                         }}
-                                        className="py-4 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-2xl font-bold text-lg transition-all active:scale-95"
                                         disabled={uploadingImage}
+                                        className="py-4 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-2xl font-bold text-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                                     >
                                         ยกเลิก
                                     </button>
                                     <button
                                         onClick={handleAddCandidate}
-                                        className="py-4 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white rounded-2xl font-bold text-lg shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                                         disabled={uploadingImage}
+                                        className="py-4 bg-gradient-to-r from-red-500 via-red-600 to-amber-500 hover:from-red-600 hover:via-red-700 hover:to-amber-600 text-white rounded-2xl font-bold text-lg shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {uploadingImage ? (
                                             <div className="flex items-center justify-center gap-2">
-                                                <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
-                                                <span>กำลังอัปโหลด...</span>
+                                                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                <span>กำลังบันทึก...</span>
                                             </div>
                                         ) : (
-                                            <span>✓ เพิ่มผู้สมัคร</span>
+                                            <div className="flex items-center justify-center gap-2">
+                                                <span>✨</span>
+                                                <span>เพิ่มผู้สมัคร</span>
+                                            </div>
                                         )}
                                     </button>
                                 </div>

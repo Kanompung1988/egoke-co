@@ -59,12 +59,11 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isOwner(userId);
       
       // แก้ไขได้:
-      // - ตัวเอง (แต่ห้ามแก้ role, points, tickets)
+      // - ตัวเอง (รวมถึงแก้ voteRights, voteHistory สำหรับการโหวต)
       // - Register (แก้ได้เฉพาะ attendance สำหรับเช็คเข้างาน)
       // - Admin ขึ้นไป (admin, superadmin) แก้ได้ทุกอย่าง
       allow update: if isAuthenticated() && (
-        (isOwner(userId) && 
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'points', 'tickets']))
+        isOwner(userId)  // ✅ ให้ user แก้ได้เอง (สำหรับโหวตและซื้อสิทธิ์)
         || (isRegister() && 
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendance']))
         || isAdmin()
@@ -117,8 +116,8 @@ service cloud.firestore {
       // อ่านได้: ทุกคนที่ login แล้ว
       allow read: if isAuthenticated();
       
-      // สร้าง/แก้ไข/ลบ: เฉพาะ Staff ขึ้นไป
-      allow create, update, delete: if isStaff();
+      // สร้าง/แก้ไข/ลบ: เฉพาะ Admin ขึ้นไป (admin, superadmin)
+      allow create, update, delete: if isAdmin();
     }
 
     // ===================================
@@ -128,8 +127,8 @@ service cloud.firestore {
       // อ่านได้: ทุกคนที่ login แล้ว
       allow read: if isAuthenticated();
       
-      // แก้ไข: เฉพาะ Staff ขึ้นไป (เปิด/ปิดการโหวต)
-      allow create, update, delete: if isStaff();
+      // แก้ไข: เฉพาะ Admin ขึ้นไป (เปิด/ปิดการโหวต)
+      allow create, update, delete: if isAdmin();
     }
 
     // ===================================
