@@ -75,17 +75,17 @@ export default function PurchaseVoteRightsModal({
             
             {/* Modal */}
             <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
-                <div className="relative bg-gradient-to-br from-white to-blue-50/30 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up">
-                    {/* Header */}
-                    <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 rounded-t-3xl sm:rounded-t-3xl">
+                <div className="relative bg-gradient-to-br from-white to-amber-50/30 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up">
+                    {/* Header - Red to Gold Gradient */}
+                    <div className="sticky top-0 bg-gradient-to-r from-red-600 via-red-700 to-amber-600 px-6 py-4 rounded-t-3xl sm:rounded-t-3xl shadow-xl">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center ring-2 ring-white/30">
                                     <span className="text-3xl">🎫</span>
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-xl text-white">ซื้อสิทธิ์โหวต</h3>
-                                    <p className="text-white/80 text-sm">{categoryNames[category]}</p>
+                                    <h3 className="font-bold text-xl text-white drop-shadow-lg">ซื้อสิทธิ์โหวต</h3>
+                                    <p className="text-white/90 text-sm font-medium">{categoryNames[category]}</p>
                                 </div>
                             </div>
                             <button
@@ -102,23 +102,23 @@ export default function PurchaseVoteRightsModal({
 
                     {/* Content */}
                     <div className="p-6 space-y-5">
-                        {/* Current Status */}
+                        {/* Current Status - Red & Gold Theme */}
                         <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-gradient-to-br from-purple-100 to-purple-50 rounded-2xl p-4 border-2 border-purple-200">
-                                <div className="text-purple-600 text-sm font-medium mb-1">สิทธิ์ปัจจุบัน</div>
-                                <div className="text-3xl font-bold text-purple-900">{currentRights}</div>
-                                <div className="text-purple-600 text-xs">ครั้ง</div>
+                            <div className="bg-gradient-to-br from-red-100 via-red-50 to-pink-50 rounded-2xl p-4 border-2 border-red-300 shadow-md">
+                                <div className="text-red-700 text-sm font-bold mb-1">สิทธิ์ปัจจุบัน</div>
+                                <div className="text-3xl font-bold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">{currentRights}</div>
+                                <div className="text-red-600 text-xs font-medium">ครั้ง</div>
                             </div>
-                            <div className="bg-gradient-to-br from-amber-100 to-amber-50 rounded-2xl p-4 border-2 border-amber-200">
-                                <div className="text-amber-600 text-sm font-medium mb-1">แต้มของคุณ</div>
-                                <div className="text-3xl font-bold text-amber-900">{currentPoints}</div>
-                                <div className="text-amber-600 text-xs">แต้ม</div>
+                            <div className="bg-gradient-to-br from-amber-100 via-yellow-50 to-orange-50 rounded-2xl p-4 border-2 border-amber-300 shadow-md">
+                                <div className="text-amber-700 text-sm font-bold mb-1">แต้มของคุณ</div>
+                                <div className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">{currentPoints}</div>
+                                <div className="text-amber-600 text-xs font-medium">แต้ม</div>
                             </div>
                         </div>
 
                         {/* Amount Selector */}
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-3">
+                            <label className="block text-sm font-bold text-gray-800 mb-3">
                                 เลือกจำนวนสิทธิ์ที่ต้องการซื้อ
                             </label>
                             <div className="flex items-center gap-3">
@@ -129,11 +129,11 @@ export default function PurchaseVoteRightsModal({
                                 >
                                     −
                                 </button>
-                                <div className="flex-1 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-4 border-2 border-blue-200">
-                                    <div className="text-6xl font-bold text-center bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                                <div className="flex-1 bg-gradient-to-br from-red-50 via-amber-50 to-orange-50 rounded-2xl p-4 border-2 border-amber-300 shadow-md">
+                                    <div className="text-6xl font-bold text-center bg-gradient-to-r from-red-600 via-red-700 to-amber-600 bg-clip-text text-transparent">
                                         {rightsAmount}
                                     </div>
-                                    <div className="text-center text-gray-600 text-sm font-medium mt-1">สิทธิ์</div>
+                                    <div className="text-center text-gray-700 text-sm font-bold mt-1">สิทธิ์</div>
                                 </div>
                                 <button
                                     className="w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl font-bold text-2xl shadow-lg transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
@@ -151,10 +151,10 @@ export default function PurchaseVoteRightsModal({
                                 <button
                                     key={amount}
                                     onClick={() => setRightsAmount(amount)}
-                                    className={`py-2 px-3 rounded-xl font-bold text-sm transition-all ${
+                                    className={`py-2 px-3 rounded-xl font-bold text-sm transition-all shadow-md ${
                                         rightsAmount === amount
-                                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg scale-105'
-                                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                            ? 'bg-gradient-to-r from-red-600 via-red-700 to-amber-600 text-white shadow-lg scale-105'
+                                            : 'bg-white hover:bg-gray-50 text-gray-700 border-2 border-gray-200'
                                     }`}
                                     disabled={isPurchasing}
                                 >
@@ -163,18 +163,18 @@ export default function PurchaseVoteRightsModal({
                             ))}
                         </div>
 
-                        {/* Price Summary */}
-                        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-4 text-white">
+                        {/* Price Summary - Red to Gold Gradient */}
+                        <div className="bg-gradient-to-r from-red-600 via-red-700 to-amber-600 rounded-2xl p-5 text-white shadow-xl">
                             <div className="flex justify-between items-center mb-2">
-                                <span className="text-white/90">ราคาต่อสิทธิ์:</span>
+                                <span className="text-white/90 font-medium">ราคาต่อสิทธิ์:</span>
                                 <span className="font-bold text-lg">{POINTS_PER_RIGHT} แต้ม</span>
                             </div>
-                            <div className="h-px bg-white/30 my-2"></div>
+                            <div className="h-px bg-white/30 my-3"></div>
                             <div className="flex justify-between items-center">
                                 <span className="font-bold text-lg">ยอดรวม:</span>
                                 <div className="text-right">
-                                    <div className="text-3xl font-bold">{totalCost}</div>
-                                    <div className="text-white/90 text-sm">แต้ม</div>
+                                    <div className="text-3xl font-bold drop-shadow-lg">{totalCost}</div>
+                                    <div className="text-white/90 text-sm font-medium">แต้ม</div>
                                 </div>
                             </div>
                         </div>
@@ -210,17 +210,17 @@ export default function PurchaseVoteRightsModal({
                             </div>
                         </div>
 
-                        {/* Action Buttons */}
+                        {/* Action Buttons - Red to Gold Theme */}
                         <div className="grid grid-cols-2 gap-3 pt-2">
                             <button
-                                className="py-4 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-2xl font-bold text-lg transition-all active:scale-95 disabled:opacity-50"
+                                className="py-4 bg-gradient-to-br from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 rounded-2xl font-bold text-lg shadow-md transition-all active:scale-95 disabled:opacity-50 border-2 border-gray-300"
                                 onClick={onClose}
                                 disabled={isPurchasing}
                             >
                                 ยกเลิก
                             </button>
                             <button
-                                className={`py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-2xl font-bold text-lg shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                className={`py-4 bg-gradient-to-r from-red-600 via-red-700 to-amber-600 hover:from-red-700 hover:via-red-800 hover:to-amber-700 text-white rounded-2xl font-bold text-lg shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
                                     isPurchasing ? 'animate-pulse' : ''
                                 }`}
                                 onClick={handlePurchase}
@@ -233,7 +233,7 @@ export default function PurchaseVoteRightsModal({
                                     </div>
                                 ) : (
                                     <div className="flex items-center justify-center gap-2">
-                                        <span>✓</span>
+                                        <span>✨</span>
                                         <span>ซื้อ {rightsAmount} สิทธิ์</span>
                                     </div>
                                 )}
