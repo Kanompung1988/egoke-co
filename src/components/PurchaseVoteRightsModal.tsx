@@ -66,16 +66,16 @@ export default function PurchaseVoteRightsModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="fixed inset-0 z-50 overflow-y-auto pb-safe">
             {/* Backdrop */}
             <div 
                 className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
                 onClick={onClose}
             />
             
-            {/* Modal */}
-            <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
-                <div className="relative bg-gradient-to-br from-white to-amber-50/30 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up">
+            {/* Modal - ไม่ทับ Navbar */}
+            <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4 pb-20 sm:pb-4">
+                <div className="relative bg-gradient-to-br from-white to-amber-50/30 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-lg max-h-[calc(100vh-100px)] sm:max-h-[90vh] overflow-y-auto animate-slide-up">
                     {/* Header - Red to Gold Gradient */}
                     <div className="sticky top-0 bg-gradient-to-r from-red-600 via-red-700 to-amber-600 px-6 py-4 rounded-t-3xl sm:rounded-t-3xl shadow-xl">
                         <div className="flex items-center justify-between">

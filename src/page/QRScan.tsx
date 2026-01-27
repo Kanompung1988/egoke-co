@@ -5,6 +5,7 @@ import { db, addPointsToUser } from '../firebaseApp';
 import { useAuth } from '../hooks/useAuth';
 import BottomNav from '../components/BottomNav';
 import QrScanner from '../components/QrScanner';
+import { logAdminAdjustPoints } from '../utils/activityLogger';
 
 interface LastTransaction {
     userName: string;
@@ -169,7 +170,28 @@ export default function QRScan() {
         setError('');
         
         try {
+            // ดึงข้อมูล user เพื่อเก็บ points เดิม
+            const userRef = doc(db, 'users', scannedUser.uid);
+            const userSnap = await getDoc(userRef);
+            const userData = userSnap.data();
+            const pointsBefore = userData?.points || 0;
+            const pointsAfter = pointsBefore + pointsToAdd;
+            
+            // เพิ่มแต้ม
             await addPointsToUser(scannedUser.uid, pointsToAdd);
+            
+            // บันทึก activity log
+            await logAdminAdjustPoints(
+                scannedUser.uid,
+                scannedUser.email,
+                scannedUser.displayName,
+                pointsBefore,
+                pointsAfter,
+                currentUser?.uid || '',
+                currentUser?.email || '',
+                'เพิ่มแต้มผ่าน QR Scan'
+            );
+            
             setLastTransaction({
                 userName: scannedUser.displayName,
                 pointsAdded: pointsToAdd,

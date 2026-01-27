@@ -8,6 +8,8 @@ const LOG_TYPE_COLORS = {
     VOTE_CAST: 'bg-blue-100 text-blue-800 border-blue-300',
     VOTE_RIGHTS_PURCHASE: 'bg-purple-100 text-purple-800 border-purple-300',
     PRIZE_CLAIM: 'bg-amber-100 text-amber-800 border-amber-300',
+    GAME_SPIN: 'bg-pink-100 text-pink-800 border-pink-300',
+    ADMIN_ADJUST: 'bg-orange-100 text-orange-800 border-orange-300',
 };
 
 const LOG_TYPE_EMOJI = {
@@ -16,6 +18,8 @@ const LOG_TYPE_EMOJI = {
     VOTE_CAST: '🗳️',
     VOTE_RIGHTS_PURCHASE: '🎫',
     PRIZE_CLAIM: '🎁',
+    GAME_SPIN: '🎰',
+    ADMIN_ADJUST: '👨‍💼',
 };
 
 const LOG_TYPE_LABELS = {
@@ -24,6 +28,8 @@ const LOG_TYPE_LABELS = {
     VOTE_CAST: 'โหวต',
     VOTE_RIGHTS_PURCHASE: 'ซื้อสิทธิ์',
     PRIZE_CLAIM: 'แลกของรางวัล',
+    GAME_SPIN: 'หมุนวงล้อ',
+    ADMIN_ADJUST: 'ปรับแต้ม',
 };
 
 export default function ActivityLogsViewer() {

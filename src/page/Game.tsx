@@ -21,6 +21,7 @@ import UserSummary from "../components/UserSummary";
 import HistoryList from "../components/HistoryList";
 import PrizeModal from "../components/PrizeModal";
 import TicketModal from "../components/TicketModal";
+import { logWheelSpin } from "../utils/activityLogger";
 
 type HistoryItem = {
     id?: string; // Document ID from Firestore
@@ -170,7 +171,9 @@ export default function Game() {
             const segAngle = 360 / prizes.length;
             const spinRotations = 5; // Base rotations
             const extraRotations = Math.random() * 3; // Random extra rotations
-            const targetAngle = 360 - (prizeIndex * segAngle + segAngle / 2); // Center the pointer
+            
+            // ✅ แก้ไข: ลูกศรอยู่ทางขวา (0 degrees) ให้ชี้ตรงกลางของรางวัล
+            const targetAngle = -(prizeIndex * segAngle + segAngle / 2);
             const totalRotation = (spinRotations + extraRotations) * 360 + targetAngle;
             const newRotation = currentRotationRef.current + totalRotation;
 
@@ -186,6 +189,9 @@ export default function Game() {
             // --- Update Firestore and State ---
             const uid = user.uid;
             const userRef = doc(db, "users", uid);
+            
+            // เก็บแต้มก่อนหมุน
+            const pointsBefore = points ?? 0;
 
             // ✅ 1. Deduct points using increment() to prevent race condition
             await updateDoc(userRef, { 
@@ -193,7 +199,20 @@ export default function Game() {
             });
             
             // Update local state
-            setPoints(prev => Math.max(0, (prev ?? 0) - DEFAULT_SPIN_COST));
+            const pointsAfter = Math.max(0, pointsBefore - DEFAULT_SPIN_COST);
+            setPoints(pointsAfter);
+            
+            // บันทึก activity log
+            await logWheelSpin(
+                uid,
+                user.email || '',
+                user.displayName || 'Unknown',
+                winningPrize,
+                winningEmoji,
+                pointsBefore,
+                pointsAfter,
+                DEFAULT_SPIN_COST
+            );
 
             // 2. ✅ Save to History Subcollection
             const ticketId = generateTicketId();

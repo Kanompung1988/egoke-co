@@ -162,3 +162,62 @@ export async function logPrizeClaim(
         },
     });
 }
+
+// Admin/Staff จัดการแต้ม
+export async function logAdminAdjustPoints(
+    userId: string,
+    userEmail: string,
+    userName: string,
+    pointsBefore: number,
+    pointsAfter: number,
+    adjustedBy: string,
+    adjustedByEmail: string,
+    reason?: string
+): Promise<void> {
+    const change = pointsAfter - pointsBefore;
+    const action = change > 0 ? 'เพิ่ม' : 'ลด';
+    
+    await logActivity({
+        userId,
+        userEmail,
+        userName,
+        type: change > 0 ? 'POINT_GRANT' : 'POINT_DEDUCT',
+        description: `Admin ${action}แต้ม ${Math.abs(change)} แต้ม${reason ? `: ${reason}` : ''}`,
+        pointsBefore,
+        pointsAfter,
+        metadata: {
+            adjustedBy,
+            adjustedByEmail,
+            reason,
+            isAdminAction: true,
+        },
+    });
+}
+
+// Game wheel spin
+export async function logWheelSpin(
+    userId: string,
+    userEmail: string,
+    userName: string,
+    prizeName: string,
+    prizeEmoji: string,
+    pointsBefore: number,
+    pointsAfter: number,
+    spinCost: number
+): Promise<void> {
+    await logActivity({
+        userId,
+        userEmail,
+        userName,
+        type: 'GAME_SPIN',
+        description: `หมุนวงล้อ (ใช้ ${spinCost} แต้ม) ได้: ${prizeEmoji} ${prizeName}`,
+        pointsBefore,
+        pointsAfter,
+        metadata: {
+            prizeName,
+            prizeEmoji,
+            spinCost,
+        },
+    });
+}
+

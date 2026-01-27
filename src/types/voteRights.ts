@@ -36,7 +36,7 @@ export interface ActivityLog {
     userId: string;
     userEmail: string;
     userName: string;
-    type: 'POINT_GRANT' | 'POINT_DEDUCT' | 'VOTE_CAST' | 'VOTE_RIGHTS_PURCHASE' | 'PRIZE_CLAIM';
+    type: 'POINT_GRANT' | 'POINT_DEDUCT' | 'VOTE_CAST' | 'VOTE_RIGHTS_PURCHASE' | 'PRIZE_CLAIM' | 'GAME_SPIN' | 'ADMIN_ADJUST';
     description: string;
     pointsBefore: number;
     pointsAfter: number;
@@ -49,9 +49,14 @@ export interface ActivityLog {
         rightsAmount?: number;
         grantedBy?: string;
         grantedByEmail?: string;
+        adjustedBy?: string;
+        adjustedByEmail?: string;
         reason?: string;
         prizeId?: string;
         prizeName?: string;
+        prizeEmoji?: string;
+        spinCost?: number;
+        isAdminAction?: boolean;
     };
     timestamp: Timestamp;
     ipAddress?: string;

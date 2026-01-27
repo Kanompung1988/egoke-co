@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useVoteSettings, useCandidates, useVoteStats } from '../hooks/useVote';
 import { db, getAllUsers, setUserRole, uploadImage } from '../firebaseApp';
-import { doc, updateDoc, collection, addDoc, deleteDoc, Timestamp, getDocs, query, where, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, deleteDoc, Timestamp, getDocs, query, where, setDoc, getDoc } from 'firebase/firestore';
 import BottomNav from '../components/BottomNav';
 import type { VoteCategory } from '../hooks/useVote'; // นำเข้า type ถ้ามี
+import { logAdminAdjustPoints } from '../utils/activityLogger';
 
 // ✅ 1. เพิ่ม sheetId และ imageFile ใน Interface
 interface CandidateForm {
@@ -185,9 +186,28 @@ export default function Admin() {
 
         try {
             const userRef = doc(db, 'users', userId);
+            
+            // ดึงข้อมูล user เพื่อเก็บ points เดิม
+            const userSnap = await getDoc(userRef);
+            const userData = userSnap.data();
+            const pointsBefore = userData?.points || 0;
+            
+            // อัพเดตแต้ม
             await updateDoc(userRef, {
                 points: newPoints
             });
+            
+            // บันทึก activity log
+            await logAdminAdjustPoints(
+                userId,
+                userData?.email || '',
+                userData?.displayName || 'Unknown',
+                pointsBefore,
+                newPoints,
+                currentUser?.uid || '',
+                currentUser?.email || '',
+                'Admin แก้ไขแต้มโดยตรง'
+            );
             
             setUsers(users.map(u => 
                 u.uid === userId 
@@ -196,7 +216,7 @@ export default function Admin() {
             ));
             
             setEditingUserId(null);
-            alert('✅ อัพเดตคะแนนสำเร็จ');
+            alert('✅ อัพเดตคะแนนสำเร็จ และบันทึก Activity Log แล้ว');
         } catch (error) {
             console.error('Failed to update points:', error);
             alert('ไม่สามารถอัพเดตคะแนนได้');
