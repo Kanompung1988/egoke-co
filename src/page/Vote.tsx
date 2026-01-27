@@ -6,14 +6,14 @@ import BottomNav from "../components/BottomNav";
 import type { Candidate } from '../hooks/useVote';
 
 const CATEGORIES = [
-    { id: 'karaoke', name: 'Karaoke Contest', emoji: '🎤', description: 'ร้องเพลงให้ดีที่สุด' },
-    { id: 'food', name: 'Best Food', emoji: '🍜', description: 'อาหารอร่อยที่สุด' },
-    { id: 'cosplay', name: 'Cosplay Contest', emoji: '👘', description: 'คอสเพลย์สวยที่สุด' },
+    { id: 'band', name: 'Band', emoji: '🎸', description: 'วงดนตรี' },
+    { id: 'solo', name: 'Solo', emoji: '🎤', description: 'นักร้องเดี่ยว' },
+    { id: 'cover', name: 'Cover', emoji: '💃', description: 'Cover Dance' },
 ];
 
 export default function Vote() {
     const { currentUser } = useAuth();
-    const [selectedCategory, setSelectedCategory] = useState<string>('karaoke');
+    const [selectedCategory, setSelectedCategory] = useState<string>('band');
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
     const [votingInProgress, setVotingInProgress] = useState(false);
@@ -216,9 +216,9 @@ export default function Vote() {
                                         />
                                     ) : (
                                         <div className="w-full h-full bg-gradient-to-br from-red-300 via-amber-300 to-yellow-300 flex items-center justify-center text-8xl">
-                                            {votedCandidate.category === 'karaoke' && '🎤'}
-                                            {votedCandidate.category === 'food' && '🍜'}
-                                            {votedCandidate.category === 'cosplay' && '👘'}
+                                            {votedCandidate.category === 'band' && '�'}
+                                            {votedCandidate.category === 'solo' && '�'}
+                                            {votedCandidate.category === 'cover' && '�'}
                                         </div>
                                     )}
                                 </div>
@@ -531,9 +531,9 @@ export default function Vote() {
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-6xl">
-                                            {candidate.category === 'karaoke' && '🎤'}
-                                            {candidate.category === 'food' && '🍜'}
-                                            {candidate.category === 'cosplay' && '👘'}
+                                            {candidate.category === 'band' && '�'}
+                                            {candidate.category === 'solo' && '�'}
+                                            {candidate.category === 'cover' && '�'}
                                         </div>
                                     )}
                                     
@@ -622,9 +622,9 @@ export default function Vote() {
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-5xl">
-                                            {selectedCandidate.category === 'karaoke' && '🎤'}
-                                            {selectedCandidate.category === 'food' && '🍜'}
-                                            {selectedCandidate.category === 'cosplay' && '👘'}
+                                            {selectedCandidate.category === 'band' && '�'}
+                                            {selectedCandidate.category === 'solo' && '�'}
+                                            {selectedCandidate.category === 'cover' && '�'}
                                         </div>
                                     )}
                                 </div>
@@ -662,6 +662,25 @@ export default function Vote() {
                     </div>
                 </div>
             )}
+
+            {/* Vote Weight Notice - Bottom Panel */}
+            <div className="max-w-7xl mx-auto px-6 pb-6">
+                <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-5 shadow-xl border border-gray-200">
+                    <div className="text-center mb-3">
+                        <h3 className="font-bold text-lg text-gray-800">📋 เกี่ยวกับคะแนนการโหวต</h3>
+                    </div>
+                    <div className="space-y-2 text-sm text-gray-700">
+                        <p className="flex items-start gap-2">
+                            <span className="text-blue-600 font-bold mt-0.5">•</span>
+                            <span>คะแนนโหวตจากเว็บไซต์นี้คิดเป็น <span className="font-bold text-blue-600">30%</span> ของคะแนนรวมทั้งหมด สำหรับการตัดสินผู้ชนะในแต่ละหมวด (Band, Solo, Cover Dance)</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                            <span className="text-purple-600 font-bold mt-0.5">•</span>
+                            <span>คะแนนส่วนที่เหลือ <span className="font-bold text-purple-600">70%</span> จะคิดจากรางวัลและการตัดสินภายในงาน EGOKE</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
 
             <BottomNav />
         </div>

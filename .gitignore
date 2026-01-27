@@ -23,4 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Environment variables - DO NOT COMMIT
+.env
 .env*.local
+.env.production
+.env.staging
+
+# Keep .env.example for reference
+!.env.example

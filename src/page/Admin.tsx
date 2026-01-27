@@ -19,13 +19,18 @@ interface UserData {
     role: string;
     points: number;
     photoURL?: string;
+    attendance?: {
+        day1?: boolean;
+        day2?: boolean;
+        day3?: boolean;
+    };
 }
 
 export default function Admin() {
     const { currentUser } = useAuth();
     const navigate = useNavigate();
     const { categories: voteSettings, loading } = useVoteSettings();
-    const [selectedCategory, setSelectedCategory] = useState('karaoke');
+    const [selectedCategory, setSelectedCategory] = useState('band');
     const { candidates } = useCandidates(selectedCategory);
     const { totalVotes } = useVoteStats(selectedCategory);
 
@@ -40,15 +45,18 @@ export default function Admin() {
     const [users, setUsers] = useState<UserData[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
     const [activeTab, setActiveTab] = useState<'vote' | 'users'>('vote');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [editingUserId, setEditingUserId] = useState<string | null>(null);
+    const [editPoints, setEditPoints] = useState<number>(0);
 
     const isAdmin = currentUser?.role === 'admin';
     const isSuperAdmin = currentUser?.role === 'superadmin';
     const canManageUsers = isAdmin || isSuperAdmin;
 
-    // Check if user is admin, staff, or superadmin
+    // Check if user is admin or superadmin (Staff cannot access Admin Dashboard)
     useEffect(() => {
-        if (!loading && !['admin', 'staff', 'superadmin'].includes(currentUser?.role || '')) {
-            alert('คุณไม่มีสิทธิ์เข้าถึงหน้านี้');
+        if (!loading && !['admin', 'superadmin'].includes(currentUser?.role || '')) {
+            alert('คุณไม่มีสิทธิ์เข้าถึงหน้า Admin Dashboard');
             navigate('/');
         }
     }, [currentUser, loading, navigate]);
@@ -93,6 +101,58 @@ export default function Admin() {
             setLoadingUsers(false);
         }
     };
+
+    const handleAttendanceChange = async (userId: string, day: 'day1' | 'day2' | 'day3', checked: boolean) => {
+        try {
+            const userRef = doc(db, 'users', userId);
+            await updateDoc(userRef, {
+                [`attendance.${day}`]: checked
+            });
+            
+            // Update local state
+            setUsers(users.map(u => 
+                u.uid === userId 
+                    ? { ...u, attendance: { ...u.attendance, [day]: checked } }
+                    : u
+            ));
+        } catch (error) {
+            console.error('Failed to update attendance:', error);
+            alert('ไม่สามารถอัพเดตการเข้างานได้');
+        }
+    };
+
+    const handleUpdatePoints = async (userId: string, newPoints: number) => {
+        if (isNaN(newPoints) || newPoints < 0) {
+            alert('กรุณาใส่คะแนนที่ถูกต้อง');
+            return;
+        }
+
+        try {
+            const userRef = doc(db, 'users', userId);
+            await updateDoc(userRef, {
+                points: newPoints
+            });
+            
+            // Update local state
+            setUsers(users.map(u => 
+                u.uid === userId 
+                    ? { ...u, points: newPoints }
+                    : u
+            ));
+            
+            setEditingUserId(null);
+            alert('✅ อัพเดตคะแนนสำเร็จ');
+        } catch (error) {
+            console.error('Failed to update points:', error);
+            alert('ไม่สามารถอัพเดตคะแนนได้');
+        }
+    };
+
+    // Filter users based on search query
+    const filteredUsers = users.filter(user => 
+        user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.displayName.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     // Function to sync vote counts from votes collection
     const syncVoteCounts = async (category: string) => {
@@ -278,12 +338,36 @@ export default function Admin() {
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-2xl font-bold text-gray-800">👥 จัดการผู้ใช้และสิทธิ์</h2>
                             <button
-                                onClick={loadUsers}
-                                disabled={loadingUsers}
-                                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-bold transition-colors disabled:opacity-50"
+                                onClick={() => window.location.reload()}
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-bold transition-colors"
                             >
-                                {loadingUsers ? '⏳ กำลังโหลด...' : '🔄 รีเฟรช'}
+                                🔄 รีเฟรช
                             </button>
+                        </div>
+
+                        {/* Search Bar */}
+                        <div className="mb-6">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="🔍 ค้นหาชื่อหรืออีเมล..."
+                                    className="w-full px-4 py-3 pl-12 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none text-gray-800"
+                                />
+                                <span className="absolute left-4 top-3.5 text-xl">🔍</span>
+                                {searchQuery && (
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        className="absolute right-3 top-2.5 bg-gray-200 hover:bg-gray-300 text-gray-600 px-3 py-1 rounded-lg text-sm font-bold"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+                            <p className="text-sm text-gray-500 mt-2">
+                                แสดง {filteredUsers.length} จาก {users.length} ผู้ใช้
+                            </p>
                         </div>
 
                         {loadingUsers ? (
@@ -295,15 +379,17 @@ export default function Admin() {
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
-                                        <tr className="border-b-2 border-gray-200">
+                                        <tr className="border-b-2 border-gray-200 bg-gray-50">
                                             <th className="text-left p-3 font-bold text-gray-700">อีเมล</th>
                                             <th className="text-left p-3 font-bold text-gray-700">ชื่อ</th>
                                             <th className="text-center p-3 font-bold text-gray-700">Role</th>
+                                            <th className="text-center p-3 font-bold text-gray-700">เข้างาน</th>
                                             <th className="text-right p-3 font-bold text-gray-700">Points</th>
+                                            <th className="text-center p-3 font-bold text-gray-700">จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {users.map((user) => (
+                                        {filteredUsers.map((user) => (
                                             <tr key={user.uid} className="border-b border-gray-100 hover:bg-gray-50">
                                                 <td className="p-3 text-sm text-gray-800">{user.email}</td>
                                                 <td className="p-3 text-sm text-gray-800">{user.displayName}</td>
@@ -320,19 +406,90 @@ export default function Admin() {
                                                         >
                                                             <option value="user">👤 User</option>
                                                             <option value="staff">🔧 Staff</option>
+                                                            <option value="register">📋 Register</option>
                                                             {isSuperAdmin && <option value="admin">🛡️ Admin</option>}
                                                         </select>
                                                     )}
                                                 </td>
-                                                <td className="p-3 text-right font-mono text-sm">{user.points.toLocaleString()}</td>
+                                                <td className="p-3">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <label className="flex items-center gap-1 cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={user.attendance?.day1 || false}
+                                                                onChange={(e) => handleAttendanceChange(user.uid, 'day1', e.target.checked)}
+                                                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                                            />
+                                                            <span className="text-xs text-gray-600">D1</span>
+                                                        </label>
+                                                        <label className="flex items-center gap-1 cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={user.attendance?.day2 || false}
+                                                                onChange={(e) => handleAttendanceChange(user.uid, 'day2', e.target.checked)}
+                                                                className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                                                            />
+                                                            <span className="text-xs text-gray-600">D2</span>
+                                                        </label>
+                                                        <label className="flex items-center gap-1 cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={user.attendance?.day3 || false}
+                                                                onChange={(e) => handleAttendanceChange(user.uid, 'day3', e.target.checked)}
+                                                                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                                                            />
+                                                            <span className="text-xs text-gray-600">D3</span>
+                                                        </label>
+                                                    </div>
+                                                </td>
+                                                <td className="p-3 text-right">
+                                                    {editingUserId === user.uid ? (
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <input
+                                                                type="number"
+                                                                value={editPoints}
+                                                                onChange={(e) => setEditPoints(Number(e.target.value))}
+                                                                className="w-24 px-2 py-1 border-2 border-purple-500 rounded-lg text-sm font-mono text-center"
+                                                                autoFocus
+                                                            />
+                                                            <button
+                                                                onClick={() => handleUpdatePoints(user.uid, editPoints)}
+                                                                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs font-bold"
+                                                            >
+                                                                ✓
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setEditingUserId(null)}
+                                                                className="bg-gray-400 hover:bg-gray-500 text-white px-2 py-1 rounded text-xs font-bold"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="font-mono text-sm">{user.points.toLocaleString()}</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    {editingUserId !== user.uid && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingUserId(user.uid);
+                                                                setEditPoints(user.points);
+                                                            }}
+                                                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-bold"
+                                                        >
+                                                            ✏️ แก้
+                                                        </button>
+                                                    )}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
 
-                                {users.length === 0 && (
+                                {filteredUsers.length === 0 && (
                                     <div className="text-center py-12 text-gray-500">
-                                        ไม่พบข้อมูลผู้ใช้
+                                        {searchQuery ? 'ไม่พบผู้ใช้ที่ค้นหา' : 'ไม่พบข้อมูลผู้ใช้'}
                                     </div>
                                 )}
                             </div>
@@ -343,10 +500,23 @@ export default function Admin() {
                                 <strong>ℹ️ หมายเหตุ:</strong>
                                 <ul className="list-disc ml-4 mt-2 space-y-1">
                                     <li>👤 <strong>User</strong>: ผู้ใช้ทั่วไป</li>
-                                    <li>🔧 <strong>Staff</strong>: จัดการระบบโหวต</li>
-                                    <li>🛡️ <strong>Admin</strong>: จัดการระบบโหวต + เพิ่ม Staff</li>
+                                    <li>🔧 <strong>Staff</strong>: สแกน QR + จัดการระบบโหวต</li>
+                                    <li>📋 <strong>Register</strong>: เช็คเข้างานเท่านั้น (ไม่มีสิทธิ์อื่น)</li>
+                                    <li>🛡️ <strong>Admin</strong>: จัดการระบบโหวต + จัดการผู้ใช้</li>
                                     <li>👑 <strong>SuperAdmin</strong>: สิทธิ์เต็ม (เพิ่ม Admin ได้)</li>
                                 </ul>
+                                <div className="mt-3 pt-3 border-t border-blue-200">
+                                    <strong>📅 การเช็คเข้างาน:</strong>
+                                    <ul className="list-disc ml-4 mt-1 space-y-1">
+                                        <li><span className="text-blue-600">D1</span> = วันที่ 1</li>
+                                        <li><span className="text-green-600">D2</span> = วันที่ 2</li>
+                                        <li><span className="text-purple-600">D3</span> = วันที่ 3</li>
+                                    </ul>
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-blue-200">
+                                    <strong>💎 Points:</strong>
+                                    <p className="ml-4 mt-1">คลิก <span className="bg-blue-500 text-white px-2 py-0.5 rounded text-xs">✏️ แก้</span> เพื่อแก้ไขคะแนน</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -362,10 +532,10 @@ export default function Admin() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {Object.entries(voteSettings).map(([categoryId, category]) => {
                             const categoryInfo = {
-                                karaoke: { emoji: '🎤', name: 'Karaoke Contest' },
-                                food: { emoji: '🍜', name: 'Best Food' },
-                                cosplay: { emoji: '👘', name: 'Cosplay Contest' }
-                            }[categoryId as 'karaoke' | 'food' | 'cosplay'] || { emoji: '📋', name: categoryId };
+                                band: { emoji: '🎸', name: 'Band' },
+                                solo: { emoji: '🎤', name: 'Solo' },
+                                cover: { emoji: '💃', name: 'Cover' }
+                            }[categoryId as 'band' | 'solo' | 'cover'] || { emoji: '📋', name: categoryId };
 
                             return (
                                 <div
@@ -420,11 +590,11 @@ export default function Admin() {
 
                     {/* Category Selector */}
                     <div className="flex gap-2 mb-4">
-                        {['karaoke', 'food', 'cosplay'].map((cat) => {
+                        {['band', 'solo', 'cover'].map((cat) => {
                             const info = {
-                                karaoke: { emoji: '🎤', name: 'Karaoke' },
-                                food: { emoji: '🍜', name: 'Food' },
-                                cosplay: { emoji: '👘', name: 'Cosplay' }
+                                band: { emoji: '🎸', name: 'Band' },
+                                solo: { emoji: '🎤', name: 'Solo' },
+                                cover: { emoji: '💃', name: 'Cover' }
                             }[cat];
 
                             return (
@@ -485,9 +655,9 @@ export default function Admin() {
                                                         />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center text-2xl">
-                                                            {candidate.category === 'karaoke' && '🎤'}
-                                                            {candidate.category === 'food' && '🍜'}
-                                                            {candidate.category === 'cosplay' && '👘'}
+                                                            {candidate.category === 'band' && '�'}
+                                                            {candidate.category === 'solo' && '�'}
+                                                            {candidate.category === 'cover' && '�'}
                                                         </div>
                                                     )}
                                                 </div>
@@ -544,9 +714,9 @@ export default function Admin() {
                                     onChange={(e) => setSelectedCategory(e.target.value)}
                                     className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none"
                                 >
-                                    <option value="karaoke">🎤 Karaoke</option>
-                                    <option value="food">🍜 Food</option>
-                                    <option value="cosplay">👘 Cosplay</option>
+                                    <option value="band">� Band</option>
+                                    <option value="solo">� Solo</option>
+                                    <option value="cover">� Cover</option>
                                 </select>
                             </div>
 

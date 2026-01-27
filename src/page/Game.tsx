@@ -7,6 +7,7 @@ import {
     getDoc,
     setDoc,
     updateDoc,
+    increment,
     collection,
     addDoc, // Used to add new history documents
     query,
@@ -27,6 +28,9 @@ type HistoryItem = {
     emoji?: string;
     timestamp: number; // Use number (milliseconds since epoch) for simplicity here
     ticketId?: string;
+    claimed?: boolean; // สถานะการเคลมรางวัล
+    claimedAt?: number; // เวลาที่เคลม
+    claimedBy?: string; // UID ของคนที่เคลม
 };
 
 const DEFAULT_SPIN_COST = 20;
@@ -44,7 +48,7 @@ export default function Game() {
     const wheelRef = useRef<HTMLDivElement | null>(null);
     const currentRotationRef = useRef<number>(0);
 
-    // Prize definitions (no changes needed here)
+    // Prize definitions
     const prizes = useMemo(
         () => [
             { label: "ตั๋วกิจกรรมฟรี", emoji: "🎫", color: "#dc2626", probability: 15 },
@@ -118,6 +122,9 @@ export default function Game() {
                 emoji: doc.data().emoji,
                 timestamp: doc.data().timestamp,
                 ticketId: doc.data().ticketId,
+                claimed: doc.data().claimed || false, // เพิ่ม: สถานะการเคลม
+                claimedAt: doc.data().claimedAt || undefined, // เพิ่ม: เวลาที่เคลม
+                claimedBy: doc.data().claimedBy || undefined, // เพิ่ม: UID ของคนที่เคลม
             }));
             console.log("Loaded history items:", items); // Debug log
             setHistory(items);
@@ -182,10 +189,13 @@ export default function Game() {
             const uid = user.uid;
             const userRef = doc(db, "users", uid);
 
-            // 1. Deduct points
-            const newPoints = Math.max(0, (points ?? 0) - DEFAULT_SPIN_COST);
-            await updateDoc(userRef, { points: newPoints });
-            setPoints(newPoints); // Update local state immediately
+            // ✅ 1. Deduct points using increment() to prevent race condition
+            await updateDoc(userRef, { 
+                points: increment(-DEFAULT_SPIN_COST) 
+            });
+            
+            // Update local state
+            setPoints(prev => Math.max(0, (prev ?? 0) - DEFAULT_SPIN_COST));
 
             // 2. ✅ Save to History Subcollection
             const ticketId = generateTicketId();
@@ -194,6 +204,7 @@ export default function Game() {
                 emoji: winningEmoji,
                 timestamp: Date.now(), // Use current timestamp
                 ticketId: ticketId,
+                claimed: false, // เพิ่ม: ยังไม่ได้เคลมรางวัล
             };
 
             const historyCollectionRef = collection(db, "users", uid, "history");

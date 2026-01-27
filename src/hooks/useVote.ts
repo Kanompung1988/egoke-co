@@ -17,6 +17,7 @@ export interface VoteCategory {
     id: string;
     title: string;
     description: string;
+    emoji?: string;
     isOpen: boolean;
     openTime: Timestamp | null;
     closeTime: Timestamp | null;
@@ -235,4 +236,69 @@ export function useVoteStats(category: string) {
     }, [category]);
 
     return { totalVotes, topCandidate };
+}
+
+// ✅ Real-time Vote Logs for Admin
+export function useVoteLogs(category: string, limit: number = 50) {
+    const [logs, setLogs] = useState<VoteRecord[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!category) {
+            setLogs([]);
+            setLoading(false);
+            return;
+        }
+
+        const votesRef = collection(db, 'votes');
+        const q = query(
+            votesRef,
+            where('category', '==', category),
+            // orderBy('timestamp', 'desc') // Commented out to avoid index requirement
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const voteData = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as VoteRecord));
+
+            // Sort in memory instead
+            voteData.sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
+            
+            setLogs(voteData.slice(0, limit));
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [category, limit]);
+
+    return { logs, loading };
+}
+
+// ✅ Real-time Vote Count for Admin Dashboard
+export function useRealTimeVoteCount(category: string, sessionId: string) {
+    const [voteCount, setVoteCount] = useState(0);
+    const [voters, setVoters] = useState<string[]>([]);
+
+    useEffect(() => {
+        if (!category || !sessionId) return;
+
+        const votesRef = collection(db, 'votes');
+        const q = query(
+            votesRef,
+            where('category', '==', category),
+            where('sessionId', '==', sessionId)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setVoteCount(snapshot.size);
+            const voterNames = snapshot.docs.map(doc => doc.data().userName);
+            setVoters(voterNames);
+        });
+
+        return () => unsubscribe();
+    }, [category, sessionId]);
+
+    return { voteCount, voters };
 }

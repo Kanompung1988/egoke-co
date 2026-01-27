@@ -137,7 +137,7 @@ export default function Home() {
                             <div className="absolute inset-0 bg-gradient-to-t from-black/0 to-white/0 group-hover:from-black/5 transition-all duration-300"></div>
                         </div>
                         <div 
-                            onClick={() => navigate('/vap-ig')}
+                            onClick={() => navigate('/qrscan')}
                             className="group relative overflow-hidden bg-gradient-to-br from-red-500 via-red-600 to-red-700 p-5 rounded-2xl text-white cursor-pointer shadow-xl hover:shadow-2xl transition-all duration-300 active:scale-95 border-3 border-amber-400 hover:border-amber-300 hover:-translate-y-1"
                         >
                             <div className="relative z-10">
@@ -186,10 +186,10 @@ export default function Home() {
                                 </div>
                             </div>
                             <div className="group flex items-center gap-3 p-4 bg-white/95 rounded-xl border-2 border-amber-300 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer">
-                                <span className="text-2xl group-hover:scale-110 transition-transform duration-300">🎭</span>
+                                <span className="text-2xl group-hover:scale-110 transition-transform duration-300">🎲</span>
                                 <div>
-                                    <p className="font-semibold text-gray-800 text-sm">Cosplay Contest</p>
-                                    <p className="text-xs text-gray-600">ประกวดคอสเพลย์</p>
+                                    <p className="font-semibold text-gray-800 text-sm">EGOKE Game</p>
+                                    <p className="text-xs text-gray-600">เกมสนุกสุดมันส์</p>
                                 </div>
                             </div>
                         </div>
@@ -202,7 +202,7 @@ export default function Home() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
                     <div className="max-w-sm w-full bg-white rounded-3xl overflow-hidden shadow-2xl animate-fade-in">
                         <div className="relative">
-                            <img src="/Home-modal.jpg" alt="EG'OKE Banner" className="w-full h-40 object-cover" />
+                            <img src="/Artwork.png" alt="EG'OKE Banner" className="w-full h-40 object-cover" />
                             <button
                                 onClick={handleModalClose}
                                 className="absolute top-3 right-3 bg-white/90 hover:bg-white text-gray-800 rounded-full w-8 h-8 flex items-center justify-center shadow-lg"

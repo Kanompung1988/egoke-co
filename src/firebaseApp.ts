@@ -23,16 +23,21 @@ import {
     type Firestore
 } from "firebase/firestore";
 
-// ตั้งค่า Firebase
+// ✅ ตั้งค่า Firebase จาก Environment Variables
 const firebaseConfig = {
-    apiKey: "AIzaSyDCjt8DfkKCsjc73Oaay851FYu8pG1-3TY",
-    authDomain: "egoke-7dae5.firebaseapp.com",
-    projectId: "egoke-7dae5",
-    storageBucket: "egoke-7dae5.appspot.com",
-    messagingSenderId: "910235640821",
-    appId: "1:910235640821:web:cc5163a4eee3e8dffc76bc",
-    measurementId: "G-10MPJ3TPEB",
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
+
+// Validate Firebase config
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+    throw new Error('❌ Firebase configuration is missing. Please check your .env file.');
+}
 
 // เริ่มต้น Firebase App
 const app: FirebaseApp = initializeApp(firebaseConfig);
@@ -40,8 +45,8 @@ export const auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
-// SuperAdmin Email - ผู้ที่มีสิทธิ์สูงสุด
-const SUPER_ADMIN_EMAIL = "thanaponchanal@gmail.com";
+// ✅ SuperAdmin Email - จาก Environment Variables
+const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL || "thanaponchanal@gmail.com";
 
 // ----------------------------------------------
 // ฟังก์ชันล็อกอินด้วย Google (แบบ Popup)
@@ -122,7 +127,7 @@ async function createOrUpdateUserDocument(user: User): Promise<void> {
 // ----------------------------------------------
 export async function setUserRole(
     identifier: string, // อาจเป็น email หรือ uid
-    newRole: "user" | "staff" | "admin"
+    newRole: "user" | "staff" | "register" | "admin"
 ): Promise<{ success: boolean; error: string | null }> {
     try {
         let userId: string | null = null;
@@ -181,6 +186,11 @@ export async function getAllUsers(): Promise<Array<{
     displayName: string;
     role: string;
     points: number;
+    attendance?: {
+        day1?: boolean;
+        day2?: boolean;
+        day3?: boolean;
+    };
 }>> {
     try {
         const usersRef = collection(db, "users");
@@ -194,6 +204,7 @@ export async function getAllUsers(): Promise<Array<{
                 displayName: data.displayName || "",
                 role: data.role || "user",
                 points: data.points || 0,
+                attendance: data.attendance || {},
             };
         });
     } catch (error) {

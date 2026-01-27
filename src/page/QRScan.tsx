@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db, addPointsToUser, deductPointsFromUser } from '../firebaseApp';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { db, addPointsToUser } from '../firebaseApp';
+import { useAuth } from '../hooks/useAuth';
 import BottomNav from '../components/BottomNav';
 import QrScanner from '../components/QrScanner';
 
@@ -8,6 +10,7 @@ interface LastTransaction {
     userName: string;
     pointsAdded: number;
     isDeduction?: boolean;
+    prizeName?: string;
 }
 
 interface ScannedUser {
@@ -17,19 +20,80 @@ interface ScannedUser {
     points: number;
 }
 
+interface ScannedTicket {
+    ticketId: string;
+    userId: string;
+    userName: string;
+    prize: string;
+    emoji: string;
+    claimed: boolean;
+    timestamp: number;
+}
+
 export default function QRScan() {
+    const { currentUser } = useAuth();
+    const navigate = useNavigate();
     const [scannedUser, setScannedUser] = useState<ScannedUser | null>(null);
+    const [scannedTicket, setScannedTicket] = useState<ScannedTicket | null>(null);
     const [pointsToAdd, setPointsToAdd] = useState<number>(0);
     const [error, setError] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isScanning, setIsScanning] = useState<boolean>(true);
     const [lastTransaction, setLastTransaction] = useState<LastTransaction | null>(null);
     const [mode, setMode] = useState<'add' | 'claim'>('add'); // เพิ่ม mode เลือก
+    const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera'); // เพิ่ม: สลับระหว่างกล้องและกรอกโค้ด
+    const [manualCode, setManualCode] = useState<string>(''); // เพิ่ม: เก็บโค้ดที่กรอก
 
-    const handleScanSuccess = async (uid: string) => {
+    // Check if user has permission (Staff, Admin, or SuperAdmin)
+    useEffect(() => {
+        if (currentUser && !['staff', 'admin', 'superadmin'].includes(currentUser.role || '')) {
+            alert('คุณไม่มีสิทธิ์เข้าถึงหน้านี้ - ต้องเป็น Staff, Admin หรือ SuperAdmin เท่านั้น');
+            navigate('/');
+        }
+    }, [currentUser, navigate]);
+
+    // Show loading while checking auth
+    if (!currentUser) {
+        return (
+            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-red-600 border-t-transparent"></div>
+                    <p className="mt-4 text-gray-600">กำลังตรวจสอบสิทธิ์...</p>
+                </div>
+            </div>
+        );
+    }
+
+    const handleScanSuccess = async (scannedData: string) => {
         setIsScanning(false);
         setIsLoading(true);
         setError('');
+        
+        try {
+            if (mode === 'claim') {
+                // โหมดเคลมรางวัล - ค้นหา ticketId
+                let ticketId = scannedData;
+                
+                // ถ้า scan URL ให้ extract ticketId
+                if (scannedData.includes('/redeem/')) {
+                    ticketId = scannedData.split('/redeem/')[1];
+                }
+                
+                await handleTicketScan(ticketId);
+            } else {
+                // โหมดเพิ่มแต้ม - ค้นหา userId
+                await handleUserScan(scannedData);
+            }
+        } catch (err) {
+            console.error('Scan error:', err);
+            setError("เกิดข้อผิดพลาดในการสแกน");
+            setIsScanning(true);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleUserScan = async (uid: string) => {
         try {
             const userRef = doc(db, "users", uid);
             const userSnap = await getDoc(userRef);
@@ -46,10 +110,52 @@ export default function QRScan() {
                 setIsScanning(true);
             }
         } catch (err) {
-            setError("เกิดข้อผิดพลาดในการดึงข้อมูล");
+            setError("เกิดข้อผิดพลาดในการดึงข้อมูลผู้ใช้");
             setIsScanning(true);
-        } finally {
-            setIsLoading(false);
+        }
+    };
+
+    const handleTicketScan = async (ticketId: string) => {
+        try {
+            // ค้นหา ticket จาก history subcollection ของทุกคน
+            const usersRef = collection(db, 'users');
+            const usersSnapshot = await getDocs(usersRef);
+            
+            let ticketFound = false;
+            
+            for (const userDoc of usersSnapshot.docs) {
+                const historyRef = collection(db, 'users', userDoc.id, 'history');
+                const historyQuery = query(historyRef, where('ticketId', '==', ticketId));
+                const historySnapshot = await getDocs(historyQuery);
+                
+                if (!historySnapshot.empty) {
+                    const ticketDoc = historySnapshot.docs[0];
+                    const ticketData = ticketDoc.data();
+                    const userData = userDoc.data();
+                    
+                    setScannedTicket({
+                        ticketId: ticketId,
+                        userId: userDoc.id,
+                        userName: userData.displayName || 'ไม่ระบุชื่อ',
+                        prize: ticketData.prize || 'ไม่ระบุรางวัล',
+                        emoji: ticketData.emoji || '🎁',
+                        claimed: ticketData.claimed || false,
+                        timestamp: ticketData.timestamp || Date.now()
+                    });
+                    
+                    ticketFound = true;
+                    break;
+                }
+            }
+            
+            if (!ticketFound) {
+                setError("❌ ไม่พบตั๋วรางวัลในระบบ");
+                setIsScanning(true);
+            }
+        } catch (err) {
+            console.error('Ticket scan error:', err);
+            setError("เกิดข้อผิดพลาดในการค้นหาตั๋ว");
+            setIsScanning(true);
         }
     };
 
@@ -63,31 +169,65 @@ export default function QRScan() {
         setError('');
         
         try {
-            if (mode === 'claim') {
-                // หักแต้มเพื่อเคลมรางวัล
-                if (scannedUser.points < pointsToAdd) {
-                    setError(`❌ แต้มไม่เพียงพอ (มี ${scannedUser.points} แต้ม)`);
-                    setIsLoading(false);
-                    return;
-                }
-                await deductPointsFromUser(scannedUser.uid, pointsToAdd);
-                setLastTransaction({
-                    userName: scannedUser.displayName,
-                    pointsAdded: pointsToAdd,
-                    isDeduction: true,
-                });
-            } else {
-                // เพิ่มแต้ม
-                await addPointsToUser(scannedUser.uid, pointsToAdd);
-                setLastTransaction({
-                    userName: scannedUser.displayName,
-                    pointsAdded: pointsToAdd,
-                    isDeduction: false,
-                });
-            }
+            await addPointsToUser(scannedUser.uid, pointsToAdd);
+            setLastTransaction({
+                userName: scannedUser.displayName,
+                pointsAdded: pointsToAdd,
+                isDeduction: false,
+            });
             setScannedUser(null);
         } catch (err) {
-            setError("ไม่สามารถดำเนินการได้ กรุณาตรวจสอบสิทธิ์");
+            setError("ไม่สามารถเพิ่มแต้มได้ กรุณาตรวจสอบสิทธิ์");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleClaimPrize = async () => {
+        if (!scannedTicket) {
+            setError("ไม่พบข้อมูลตั๋ว");
+            return;
+        }
+
+        if (scannedTicket.claimed) {
+            setError("❌ ตั๋วนี้ถูกเคลมไปแล้ว!");
+            return;
+        }
+        
+        setIsLoading(true);
+        setError('');
+        
+        try {
+            // อัพเดทสถานะว่า claimed แล้ว
+            const usersRef = collection(db, 'users');
+            const usersSnapshot = await getDocs(usersRef);
+            
+            for (const userDoc of usersSnapshot.docs) {
+                const historyRef = collection(db, 'users', userDoc.id, 'history');
+                const historyQuery = query(historyRef, where('ticketId', '==', scannedTicket.ticketId));
+                const historySnapshot = await getDocs(historyQuery);
+                
+                if (!historySnapshot.empty) {
+                    const ticketDocRef = historySnapshot.docs[0].ref;
+                    await updateDoc(ticketDocRef, {
+                        claimed: true,
+                        claimedAt: Date.now(),
+                        claimedBy: currentUser?.uid
+                    });
+                    break;
+                }
+            }
+            
+            setLastTransaction({
+                userName: scannedTicket.userName,
+                pointsAdded: 0,
+                isDeduction: true,
+                prizeName: scannedTicket.prize
+            });
+            setScannedTicket(null);
+        } catch (err) {
+            console.error('Claim error:', err);
+            setError("ไม่สามารถเคลมรางวัลได้");
         } finally {
             setIsLoading(false);
         }
@@ -95,10 +235,21 @@ export default function QRScan() {
 
     const resetScanner = () => {
         setScannedUser(null);
+        setScannedTicket(null);
         setError('');
         setPointsToAdd(0);
         setLastTransaction(null);
         setIsScanning(true);
+        setManualCode(''); // เคลียร์โค้ดที่กรอก
+    };
+
+    const handleManualSubmit = () => {
+        if (manualCode.trim()) {
+            handleScanSuccess(manualCode.trim());
+            setManualCode('');
+        } else {
+            setError('กรุณากรอกโค้ด');
+        }
     };
 
     return (
@@ -124,16 +275,20 @@ export default function QRScan() {
                     <span className="text-5xl">📱</span>
                     <h1 className="text-3xl font-bold text-white mt-3 drop-shadow-lg">สแกน QR Code</h1>
                     <p className="text-red-200 text-sm mt-2">
-                        {mode === 'add' ? 'สแกนเพื่อเพิ่มแต้มให้ผู้เข้าร่วมงาน' : 'สแกนเพื่อหักแต้มเคลมรางวัล'}
+                        {mode === 'add' ? 'สแกนเพื่อเพิ่มแต้มให้ผู้เข้าร่วมงาน' : 'สแกนตั๋วรางวัลเพื่อเคลม'}
                     </p>
                 </div>
 
                 {/* Mode Toggle */}
-                {!scannedUser && !lastTransaction && (
+                {!scannedUser && !scannedTicket && !lastTransaction && (
                     <div className="bg-white/95 rounded-2xl p-4 mb-4 shadow-xl animate-fade-in">
                         <div className="flex gap-2">
                             <button
-                                onClick={() => setMode('add')}
+                                onClick={() => {
+                                    setMode('add');
+                                    setScanMode('camera'); // เพิ่มแต้มใช้กล้องอย่างเดียว
+                                    setError('');
+                                }}
                                 className={`flex-1 py-3 rounded-xl font-bold transition-all ${
                                     mode === 'add'
                                         ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg'
@@ -143,7 +298,10 @@ export default function QRScan() {
                                 ➕ เพิ่มแต้ม
                             </button>
                             <button
-                                onClick={() => setMode('claim')}
+                                onClick={() => {
+                                    setMode('claim');
+                                    setError('');
+                                }}
                                 className={`flex-1 py-3 rounded-xl font-bold transition-all ${
                                     mode === 'claim'
                                         ? 'bg-gradient-to-r from-orange-600 to-red-700 text-white shadow-lg'
@@ -163,14 +321,23 @@ export default function QRScan() {
                             <span className="text-4xl text-white">{lastTransaction.isDeduction ? '🎁' : '✓'}</span>
                         </div>
                         <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                            {lastTransaction.isDeduction ? 'เคลมสำเร็จ! 🎉' : 'สำเร็จ! 🎉'}
+                            {lastTransaction.isDeduction ? 'เคลมสำเร็จ! 🎉' : 'เพิ่มแต้มสำเร็จ! 🎉'}
                         </h2>
                         <p className="text-gray-600 mb-4">
-                            {lastTransaction.isDeduction ? 'หักแต้มจาก' : 'เพิ่มแต้มให้'} <span className="font-bold text-green-600">{lastTransaction.userName}</span>
+                            {lastTransaction.isDeduction 
+                                ? <><span className="font-bold text-purple-600">{lastTransaction.userName}</span> เคลมรางวัล</>
+                                : <>เพิ่มแต้มให้ <span className="font-bold text-green-600">{lastTransaction.userName}</span></>
+                            }
                         </p>
-                        <div className={`${lastTransaction.isDeduction ? 'bg-orange-100 text-orange-700 border-orange-300' : 'bg-green-100 text-green-700 border-green-300'} font-bold text-3xl rounded-2xl px-6 py-4 border-2 mb-6`}>
-                            {lastTransaction.isDeduction ? '- ' : '+ '}{lastTransaction.pointsAdded} แต้ม
-                        </div>
+                        {lastTransaction.isDeduction ? (
+                            <div className="bg-purple-100 text-purple-700 border-purple-300 font-bold text-xl rounded-2xl px-6 py-4 border-2 mb-6">
+                                🎁 {lastTransaction.prizeName}
+                            </div>
+                        ) : (
+                            <div className="bg-green-100 text-green-700 border-green-300 font-bold text-3xl rounded-2xl px-6 py-4 border-2 mb-6">
+                                + {lastTransaction.pointsAdded} แต้ม
+                            </div>
+                        )}
                         <button 
                             onClick={resetScanner} 
                             className="w-full bg-red-500 hover:bg-red-600 text-white rounded-2xl py-4 font-bold shadow-lg transition-all active:scale-95"
@@ -230,15 +397,15 @@ export default function QRScan() {
                             <button 
                                 onClick={handleAddPoints} 
                                 disabled={isLoading || pointsToAdd <= 0}
-                                className={`w-full ${mode === 'add' ? 'bg-green-500 hover:bg-green-600' : 'bg-orange-500 hover:bg-orange-600'} disabled:bg-gray-400 text-white rounded-2xl py-4 font-bold shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed`}
+                                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded-2xl py-4 font-bold shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed"
                             >
                                 {isLoading ? (
                                     <span className="flex items-center justify-center gap-2">
                                         <span className="loading loading-spinner loading-sm" />
-                                        {mode === 'add' ? 'กำลังเพิ่ม...' : 'กำลังหัก...'}
+                                        กำลังเพิ่ม...
                                     </span>
                                 ) : (
-                                    mode === 'add' ? `✓ เพิ่ม ${pointsToAdd} แต้ม` : `🎁 เคลม ${pointsToAdd} แต้ม`
+                                    `✓ เพิ่ม ${pointsToAdd} แต้ม`
                                 )}
                             </button>
                             <button 
@@ -251,20 +418,152 @@ export default function QRScan() {
                     </div>
                 )}
 
+                {/* Ticket Found - Claim Prize */}
+                {scannedTicket && (
+                    <div className="bg-white/95 rounded-3xl p-6 shadow-2xl animate-fade-in">
+                        <div className="flex flex-col items-center mb-6">
+                            <div className="text-6xl mb-4 animate-bounce">{scannedTicket.emoji}</div>
+                            <h2 className="text-2xl font-bold text-gray-800 mb-1">{scannedTicket.prize}</h2>
+                            <p className="text-gray-500 text-sm mb-2">เจ้าของตั๋ว: {scannedTicket.userName}</p>
+                            
+                            {/* Ticket Status */}
+                            {scannedTicket.claimed ? (
+                                <div className="mt-3 bg-red-100 border-2 border-red-300 rounded-xl px-4 py-2">
+                                    <span className="text-red-700 font-bold">❌ ตั๋วนี้ถูกเคลมไปแล้ว</span>
+                                </div>
+                            ) : (
+                                <div className="mt-3 bg-green-100 border-2 border-green-300 rounded-xl px-4 py-2">
+                                    <span className="text-green-700 font-bold">✅ พร้อมเคลมรางวัล</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-purple-50 rounded-xl p-4 border-2 border-dashed border-purple-300 mb-4">
+                            <div className="text-xs text-gray-600 mb-1 text-center font-semibold">รหัสตั๋ว</div>
+                            <div className="text-center font-mono text-sm font-bold text-purple-700 break-all">
+                                {scannedTicket.ticketId}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-2 text-center">
+                                {new Date(scannedTicket.timestamp).toLocaleString('th-TH')}
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            {!scannedTicket.claimed && (
+                                <button 
+                                    onClick={handleClaimPrize} 
+                                    disabled={isLoading}
+                                    className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 disabled:bg-gray-400 text-white rounded-2xl py-4 font-bold shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed"
+                                >
+                                    {isLoading ? (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <span className="loading loading-spinner loading-sm" />
+                                            กำลังเคลม...
+                                        </span>
+                                    ) : (
+                                        '🎁 ยืนยันเคลมรางวัล'
+                                    )}
+                                </button>
+                            )}
+                            <button 
+                                onClick={resetScanner} 
+                                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-2xl py-3 transition-all font-medium"
+                            >
+                                {scannedTicket.claimed ? 'สแกนต่อ' : 'ยกเลิก'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Scanning State */}
                 {isScanning && (
                     <div className="bg-white/95 rounded-3xl p-6 shadow-2xl animate-fade-in">
-                        <p className="text-center mb-4 text-gray-600 font-medium">
-                            📷 เล็งกล้องไปที่ QR Code ของผู้เข้าร่วม
-                        </p>
-                        <div className="overflow-hidden rounded-2xl border-4 border-red-300">
-                            <QrScanner onScanSuccess={handleScanSuccess} />
-                        </div>
-                        <div className="mt-4 text-center">
-                            <p className="text-gray-500 text-sm">
-                                สแกน QR Code จากหน้า Profile ของผู้ใช้
-                            </p>
-                        </div>
+                        {/* Toggle Scan Mode - เฉพาะ "เคลมรางวัล" เท่านั้น */}
+                        {mode === 'claim' && (
+                            <div className="flex gap-2 mb-4">
+                                <button
+                                    onClick={() => setScanMode('camera')}
+                                    className={`flex-1 py-2 rounded-xl font-bold transition-all ${
+                                        scanMode === 'camera'
+                                            ? 'bg-red-500 text-white shadow-lg'
+                                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    }`}
+                                >
+                                    📷 สแกนกล้อง
+                                </button>
+                                <button
+                                    onClick={() => setScanMode('manual')}
+                                    className={`flex-1 py-2 rounded-xl font-bold transition-all ${
+                                        scanMode === 'manual'
+                                            ? 'bg-red-500 text-white shadow-lg'
+                                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    }`}
+                                >
+                                    ⌨️ กรอกรหัส
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Camera Mode หรือ เพิ่มแต้มเท่านั้น */}
+                        {(scanMode === 'camera' || mode === 'add') ? (
+                            <>
+                                <p className="text-center mb-4 text-gray-600 font-medium">
+                                    {mode === 'add' 
+                                        ? '📷 เล็งกล้องไปที่ QR Code ของผู้เข้าร่วม'
+                                        : '📷 เล็งกล้องไปที่ QR Code บนตั๋วรางวัล'
+                                    }
+                                </p>
+                                <div className="overflow-hidden rounded-2xl border-4 border-red-300 bg-black">
+                                    <QrScanner onScanSuccess={handleScanSuccess} />
+                                </div>
+                                <div className="mt-4 text-center">
+                                    <p className="text-gray-500 text-sm">
+                                        {mode === 'add'
+                                            ? '💡 สแกน QR Code จากหน้า Profile ของผู้ใช้'
+                                            : '💡 สแกน QR Code จากตั๋วรางวัล'
+                                        }
+                                    </p>
+                                </div>
+                            </>
+                        ) : (
+                            /* Manual Code Input - เฉพาะเคลมรางวัล */
+                            <>
+                                <p className="text-center mb-4 text-gray-600 font-medium">
+                                    ⌨️ กรอกรหัสตั๋วด้วยตัวเอง
+                                </p>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-gray-700 text-sm font-bold mb-2 block">
+                                            รหัสตั๋ว (Ticket Code)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={manualCode}
+                                            onChange={(e) => setManualCode(e.target.value)}
+                                            placeholder="ticket-xxxxxxxx"
+                                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 font-mono text-sm"
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    handleManualSubmit();
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleManualSubmit}
+                                        disabled={!manualCode.trim()}
+                                        className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white rounded-2xl py-4 font-bold shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed"
+                                    >
+                                        🔍 ค้นหาตั๋ว
+                                    </button>
+                                    <div className="mt-2 text-center">
+                                        <p className="text-gray-500 text-xs">
+                                            💡 รหัสอยู่ในกรอบสีม่วงใต้ QR Code ของตั๋ว
+                                        </p>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 

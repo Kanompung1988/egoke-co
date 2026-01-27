@@ -28,6 +28,13 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['superadmin', 'admin', 'staff'];
     }
     
+    // ตรวจสอบว่าเป็น Register หรือสูงกว่า (SuperAdmin > Admin > Register)
+    function isRegister() {
+      return request.auth != null 
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['superadmin', 'admin', 'register'];
+    }
+    
     // Helper function: ตรวจสอบว่าเป็นเจ้าของ document
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
@@ -45,22 +52,42 @@ service cloud.firestore {
       // อ่านได้: 
       // - ตัวเอง
       // - Staff ขึ้นไป (staff, admin, superadmin)
-      allow read: if isAuthenticated() && (isOwner(userId) || isStaff());
+      // - Register (สำหรับเช็คเข้างาน)
+      allow read: if isAuthenticated() && (isOwner(userId) || isStaff() || isRegister());
       
       // สร้างได้: เฉพาะตัวเอง (เมื่อ login ครั้งแรก)
       allow create: if isAuthenticated() && isOwner(userId);
       
       // แก้ไขได้:
       // - ตัวเอง (แต่ห้ามแก้ role, points, tickets)
+      // - Register (แก้ได้เฉพาะ attendance สำหรับเช็คเข้างาน)
       // - Admin ขึ้นไป (admin, superadmin) แก้ได้ทุกอย่าง
       allow update: if isAuthenticated() && (
         (isOwner(userId) && 
          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'points', 'tickets']))
+        || (isRegister() && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendance']))
         || isAdmin()
       );
       
       // ลบได้: เฉพาะ SuperAdmin
       allow delete: if isSuperAdmin();
+      
+      // ===================================
+      // History Subcollection (ประวัติการหมุนวงล้อของผู้ใช้)
+      // ===================================
+      match /history/{historyId} {
+        // อ่านได้: ตัวเอง หรือ Staff ขึ้นไป
+        allow read: if isAuthenticated() && (isOwner(userId) || isStaff());
+        
+        // สร้างได้: ตัวเอง (บันทึกประวัติการหมุน)
+        allow create: if isAuthenticated() && isOwner(userId);
+        
+        // แก้ไข: Staff ขึ้นไป (สำหรับเคลมรางวัล)
+        // ลบ: Admin ขึ้นไป
+        allow update: if isStaff() || isAdmin();
+        allow delete: if isAdmin();
+      }
     }
 
     // ===================================

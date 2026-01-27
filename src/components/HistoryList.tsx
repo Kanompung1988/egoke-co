@@ -5,6 +5,9 @@ type HistoryItem = {
     emoji?: string
     timestamp: number
     ticketId?: string
+    claimed?: boolean
+    claimedAt?: number
+    claimedBy?: string
 }
 
 export default function HistoryList({
@@ -31,17 +34,37 @@ export default function HistoryList({
                     history.map((result) => (
                         <div
                             key={result.id ?? result.timestamp}
-                            className="bg-gray-50 border border-gray-100 rounded-xl p-3 hover:bg-red-50 hover:border-red-200 transition-all duration-300 cursor-pointer"
+                            className={`border rounded-xl p-3 transition-all duration-300 cursor-pointer ${
+                                result.claimed 
+                                    ? 'bg-gray-100 border-gray-300 opacity-70'
+                                    : 'bg-gray-50 border-gray-100 hover:bg-red-50 hover:border-red-200'
+                            }`}
                             onClick={() => onSelect(result)}
                         >
                             <div className="flex items-center gap-3">
                                 <div className="text-3xl">{result.emoji}</div>
                                 <div className="flex-1">
                                     <p className="font-bold text-gray-800">{result.prize}</p>
-                                    <p className="text-xs text-gray-500">{new Date(result.timestamp).toLocaleTimeString("th-TH")}</p>
+                                    <p className="text-xs text-gray-500">
+                                        {new Date(result.timestamp).toLocaleString("th-TH")}
+                                    </p>
+                                    {result.claimed && result.claimedAt && (
+                                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                                            <i className="ri-check-line"></i>
+                                            ใช้แล้ว: {new Date(result.claimedAt).toLocaleString("th-TH")}
+                                        </p>
+                                    )}
                                 </div>
                                 {result.ticketId && (
-                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full border border-green-300 font-bold">✓ มีตั๋ว</span>
+                                    result.claimed ? (
+                                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full border border-red-300 font-bold flex items-center gap-1">
+                                            <i className="ri-lock-fill"></i> ใช้แล้ว
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full border border-green-300 font-bold flex items-center gap-1">
+                                            <i className="ri-checkbox-circle-fill"></i> พร้อมใช้
+                                        </span>
+                                    )
                                 )}
                             </div>
                         </div>

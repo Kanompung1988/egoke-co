@@ -4,14 +4,14 @@ import { useAuth } from '../hooks/useAuth';
 import BottomNav from "../components/BottomNav";
 
 const CATEGORIES = [
-    { id: 'karaoke', name: 'Karaoke Contest', emoji: '🎤', description: 'ประกวดร้องเพลง' },
-    { id: 'food', name: 'Best Food', emoji: '🍜', description: 'อาหารอร่อยที่สุด' },
-    { id: 'cosplay', name: 'Cosplay Contest', emoji: '👘', description: 'คอสเพลย์สวยที่สุด' },
+    { id: 'band', name: 'Band', emoji: '🎸', description: 'วงดนตรี' },
+    { id: 'solo', name: 'Solo', emoji: '🎤', description: 'นักร้องเดี่ยว' },
+    { id: 'cover', name: 'Cover', emoji: '💃', description: 'Cover Dance' },
 ];
 
 export default function VoteResults() {
     const { currentUser } = useAuth();
-    const [selectedCategory, setSelectedCategory] = useState<string>('cosplay');
+    const [selectedCategory, setSelectedCategory] = useState<string>('band');
     const { categories: voteSettings, loading: settingsLoading } = useVoteSettings();
     const { candidates, loading: candidatesLoading } = useCandidates(selectedCategory);
     const { totalVotes } = useVoteStats(selectedCategory);
@@ -66,8 +66,32 @@ export default function VoteResults() {
                         className="w-16 h-16 mx-auto mb-3 rounded-xl shadow-xl border-2 border-white/30"
                         onError={(e) => { (e.target as HTMLImageElement).src = '/art/logo.png'; }}
                     />
-                    <h1 className="text-3xl font-bold text-white drop-shadow-lg mb-2">📊 ผลการโหวต</h1>
+                    <h1 className="text-3xl font-bold text-white drop-shadow-lg mb-2">ผลการโหวต</h1>
                     <p className="text-white/80">ดูผลคะแนนแบบ Real-time</p>
+                </div>
+
+                {/* Vote Weight Notice - Top Panel */}
+                <div className="mb-6 animate-fade-in">
+                    <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-5 shadow-xl border border-gray-200">
+                        <div className="text-center mb-3">
+                            <h3 className="font-bold text-lg text-gray-800">📋 ประกาศสำคัญ</h3>
+                        </div>
+                        <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4 mb-3">
+                            <p className="text-sm font-semibold text-yellow-800 text-center">
+                                ผลการโหวตที่แสดงนี้ยังไม่ใช่ผลสุดท้าย
+                            </p>
+                        </div>
+                        <div className="space-y-2.5 text-sm text-gray-700">
+                            <div className="flex items-start gap-3 bg-blue-50 rounded-lg p-3">
+                                <span className="text-blue-600 font-bold text-lg mt-0.5">•</span>
+                                <span>คะแนนจากเว็บไซต์นี้คิดเป็นเพียง <span className="font-bold text-blue-600 text-base">30%</span> ของคะแนนรวมทั้งหมด</span>
+                            </div>
+                            <div className="flex items-start gap-3 bg-purple-50 rounded-lg p-3">
+                                <span className="text-purple-600 font-bold text-lg mt-0.5">•</span>
+                                <span>คะแนนส่วนที่เหลือ <span className="font-bold text-purple-600 text-base">70%</span> จะคิดจากรางวัลและการตัดสินภายในงาน EGOKE สำหรับประกาศผู้ชนะในหมวด Band, Solo และ Cover Dance</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Category Tabs */}
@@ -151,9 +175,9 @@ export default function VoteResults() {
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-5xl">
-                                            {winner.category === 'karaoke' && '🎤'}
-                                            {winner.category === 'food' && '🍜'}
-                                            {winner.category === 'cosplay' && '👘'}
+                                            {winner.category === 'band' && '�'}
+                                            {winner.category === 'solo' && '�'}
+                                            {winner.category === 'cover' && '�'}
                                         </div>
                                     )}
                                 </div>
@@ -206,9 +230,9 @@ export default function VoteResults() {
                                                 />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-3xl">
-                                                    {candidate.category === 'karaoke' && '🎤'}
-                                                    {candidate.category === 'food' && '🍜'}
-                                                    {candidate.category === 'cosplay' && '👘'}
+                                                    {candidate.category === 'band' && '�'}
+                                                    {candidate.category === 'solo' && '�'}
+                                                    {candidate.category === 'cover' && '�'}
                                                 </div>
                                             )}
                                         </div>

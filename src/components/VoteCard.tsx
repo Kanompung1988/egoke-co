@@ -36,9 +36,9 @@ export default function VoteCard({
                     />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center text-6xl">
-                        {candidate.category === 'karaoke' && '🎤'}
-                        {candidate.category === 'food' && '🍜'}
-                        {candidate.category === 'cosplay' && '👘'}
+                        {candidate.category === 'band' && '�'}
+                        {candidate.category === 'solo' && '�'}
+                        {candidate.category === 'cover' && '�'}
                     </div>
                 )}
                 
