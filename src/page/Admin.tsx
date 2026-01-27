@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useVoteSettings, useCandidates, useVoteStats } from '../hooks/useVote';
 import { db, getAllUsers, setUserRole } from '../firebaseApp';
-import { doc, updateDoc, collection, addDoc, deleteDoc, Timestamp, getDocs, query, where } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, deleteDoc, Timestamp, getDocs, query, where, setDoc } from 'firebase/firestore';
 import BottomNav from '../components/BottomNav';
+import type { VoteCategory } from '../hooks/useVote'; // นำเข้า type ถ้ามี
 
+// ✅ 1. เพิ่ม sheetId ใน Interface
 interface CandidateForm {
     name: string;
     description: string;
     imageUrl: string;
+    sheetId: string;
 }
 
 interface UserData {
@@ -35,25 +38,37 @@ export default function Admin() {
     const { totalVotes } = useVoteStats(selectedCategory);
 
     const [showAddModal, setShowAddModal] = useState(false);
+    
+    // ✅ 2. เพิ่มค่าเริ่มต้น sheetId เป็นค่าว่าง
     const [newCandidate, setNewCandidate] = useState<CandidateForm>({
         name: '',
         description: '',
-        imageUrl: ''
+        imageUrl: '',
+        sheetId: '' 
     });
 
     // User Management (for Admin and SuperAdmin)
     const [users, setUsers] = useState<UserData[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
-    const [activeTab, setActiveTab] = useState<'vote' | 'users'>('vote');
+    const [activeTab, setActiveTab] = useState<'vote' | 'users' | 'categories'>('vote');
     const [searchQuery, setSearchQuery] = useState('');
     const [editingUserId, setEditingUserId] = useState<string | null>(null);
     const [editPoints, setEditPoints] = useState<number>(0);
+
+    // Category Management State
+    const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+    const [editingCategory, setEditingCategory] = useState<string | null>(null);
+    const [newCategory, setNewCategory] = useState({
+        id: '',
+        title: '',
+        description: '',
+    });
 
     const isAdmin = currentUser?.role === 'admin';
     const isSuperAdmin = currentUser?.role === 'superadmin';
     const canManageUsers = isAdmin || isSuperAdmin;
 
-    // Check if user is admin or superadmin (Staff cannot access Admin Dashboard)
+    // Check if user is admin or superadmin
     useEffect(() => {
         if (!loading && !['admin', 'superadmin'].includes(currentUser?.role || '')) {
             alert('คุณไม่มีสิทธิ์เข้าถึงหน้า Admin Dashboard');
@@ -81,6 +96,45 @@ export default function Admin() {
         }
     };
 
+    // ฟังก์ชันส่งข้อมูลไป Google Sheet
+    const syncToSheet = async (category: string) => {
+        try {
+            console.log(`📤 Starting sync to Sheet for ${category}...`);
+            
+            // 1. ดึงข้อมูลผู้สมัครทั้งหมดในหมวดนี้
+            const candidatesRef = collection(db, 'candidates');
+            const q = query(candidatesRef, where('category', '==', category));
+            const snapshot = await getDocs(q);
+            
+            // 2. เตรียมข้อมูล JSON { "sheetID": voteCount }
+            const payload: Record<string, number> = {};
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (data.sheetId) {
+                    payload[data.sheetId] = data.voteCount || 0;
+                }
+            });
+
+            // 3. ส่งไป Google Apps Script
+            // ⚠️ ใส่ URL ของคุณตรงนี้
+            const SCRIPT_URL = "https://script.google.com/macros/s/xxxxxxxxxxxxxxxxxxxx/exec"; 
+            
+            await fetch(SCRIPT_URL, {
+                method: "POST",
+                mode: "no-cors",
+                body: JSON.stringify(payload),
+                headers: { "Content-Type": "application/json" }
+            });
+
+            console.log("✅ Sent to Google Sheet successfully");
+            return true;
+        } catch (error) {
+            console.error("❌ Failed to sync sheet:", error);
+            alert("ปิดโหวตสำเร็จ แต่ส่งข้อมูลไป Sheet ไม่ผ่าน กรุณากด Sync อีกครั้ง");
+            return false;
+        }
+    };
+
     const handleRoleChange = async (userId: string, email: string, newRole: string) => {
         if (!confirm(`ยืนยันการเปลี่ยน Role ของ ${email} เป็น ${newRole}?`)) return;
 
@@ -90,7 +144,7 @@ export default function Admin() {
             
             if (result.success) {
                 alert(`✅ เปลี่ยน Role เป็น ${newRole} สำเร็จ`);
-                await loadUsers(); // Reload to reflect changes
+                await loadUsers();
             } else {
                 alert(`❌ ${result.error}`);
             }
@@ -109,7 +163,6 @@ export default function Admin() {
                 [`attendance.${day}`]: checked
             });
             
-            // Update local state
             setUsers(users.map(u => 
                 u.uid === userId 
                     ? { ...u, attendance: { ...u.attendance, [day]: checked } }
@@ -133,7 +186,6 @@ export default function Admin() {
                 points: newPoints
             });
             
-            // Update local state
             setUsers(users.map(u => 
                 u.uid === userId 
                     ? { ...u, points: newPoints }
@@ -148,23 +200,17 @@ export default function Admin() {
         }
     };
 
-    // Filter users based on search query
     const filteredUsers = users.filter(user => 
         user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         user.displayName.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // Function to sync vote counts from votes collection
     const syncVoteCounts = async (category: string) => {
         console.log('🔄 Syncing vote counts for category:', category);
-        
         try {
-            // Get all candidates in this category
             const candidatesRef = collection(db, 'candidates');
             const candidatesQuery = query(candidatesRef, where('category', '==', category));
             const candidatesSnapshot = await getDocs(candidatesQuery);
-            
-            // Count votes for each candidate
             const votesRef = collection(db, 'votes');
             
             for (const candidateDoc of candidatesSnapshot.docs) {
@@ -173,15 +219,11 @@ export default function Admin() {
                 const votesSnapshot = await getDocs(votesQuery);
                 const voteCount = votesSnapshot.size;
                 
-                // Update candidate's voteCount
                 await updateDoc(doc(db, 'candidates', candidateId), {
                     voteCount: voteCount,
                     lastSyncedAt: Timestamp.now()
                 });
-                
-                console.log(`  ✅ ${candidateDoc.data().name}: ${voteCount} votes`);
             }
-            
             console.log('✅ Vote count sync completed');
         } catch (error) {
             console.error('❌ Failed to sync vote counts:', error);
@@ -193,34 +235,36 @@ export default function Admin() {
         const categorySettings = voteSettings[category];
         if (!categorySettings) return;
 
-        console.log('🔄 Toggling category:', category, 'Current user role:', currentUser?.role);
+        console.log('🔄 Toggling category:', category);
 
         try {
             const docRef = doc(db, 'voteSettings', 'config');
             const newIsOpen = !categorySettings.isOpen;
             
-            console.log('📝 Updating Firestore:', { category, newIsOpen });
-            
             await updateDoc(docRef, {
                 [`categories.${category}.isOpen`]: newIsOpen,
                 [`categories.${category}.updatedAt`]: Timestamp.now(),
-                // If opening, create new session
                 ...(newIsOpen && { [`categories.${category}.sessionId`]: `session_${Date.now()}` })
             });
             
-            // If closing, sync vote counts automatically
+            // ✅ ถ้าเป็นการ "ปิดโหวต" ให้รวมคะแนนและส่งเข้า Sheet
             if (!newIsOpen) {
                 console.log('📊 Closing vote - syncing vote counts...');
+                
+                // 1. รวมคะแนนใน Firebase ให้ชัวร์ก่อน
                 await syncVoteCounts(category);
-                alert(`⏸️ ปิดการโหวต ${category} และรวมคะแนนเรียบร้อยแล้ว ✅`);
+                
+                // 2. ส่งคะแนนล่าสุดไป Google Sheet
+                await syncToSheet(category);
+
+                alert(`⏸️ ปิดการโหวตและส่งคะแนนไป Google Sheet เรียบร้อยแล้ว! ✅`);
             } else {
                 alert(`✅ เปิดการโหวต ${category} แล้ว`);
             }
             
-            console.log('✅ Toggle success');
         } catch (error) {
             console.error('❌ Failed to toggle category:', error);
-            alert('เกิดข้อผิดพลาดในการเปลี่ยนสถานะ: ' + (error as Error).message);
+            alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
         }
     };
 
@@ -230,10 +274,7 @@ export default function Admin() {
             return;
         }
 
-        console.log('➕ Adding candidate:', newCandidate, 'User role:', currentUser?.role);
-
         try {
-            // Get current max order for this category
             const candidatesRef = collection(db, 'candidates');
             const q = query(candidatesRef, where('category', '==', selectedCategory));
             const snapshot = await getDocs(q);
@@ -242,8 +283,10 @@ export default function Admin() {
                 return order > max ? order : max;
             }, 0);
 
+            // ✅ 3. บันทึก sheetId ลง Firebase (แปลงเป็นตัวเลข)
             await addDoc(collection(db, 'candidates'), {
                 ...newCandidate,
+                sheetId: newCandidate.sheetId ? Number(newCandidate.sheetId) : null,
                 category: selectedCategory,
                 voteCount: 0,
                 order: maxOrder + 1,
@@ -251,7 +294,8 @@ export default function Admin() {
                 createdBy: currentUser?.uid || 'unknown'
             });
 
-            setNewCandidate({ name: '', description: '', imageUrl: '' });
+            // ✅ รีเซ็ตค่าหลังจากบันทึก
+            setNewCandidate({ name: '', description: '', imageUrl: '', sheetId: '' });
             setShowAddModal(false);
             alert('✅ เพิ่มผู้สมัครสำเร็จ');
         } catch (error) {
@@ -262,15 +306,88 @@ export default function Admin() {
 
     const handleDeleteCandidate = async (candidateId: string, candidateName: string) => {
         if (!confirm(`คุณแน่ใจหรือไม่ที่จะลบ "${candidateName}"?`)) return;
-
-        console.log('🗑️ Deleting candidate:', candidateId, 'User role:', currentUser?.role);
-
         try {
             await deleteDoc(doc(db, 'candidates', candidateId));
             alert('✅ ลบผู้สมัครสำเร็จ');
         } catch (error) {
             console.error('❌ Failed to delete candidate:', error);
             alert('เกิดข้อผิดพลาดในการลบผู้สมัคร: ' + (error as Error).message);
+        }
+    };
+
+    // Category Management Functions
+    const handleAddCategory = async () => {
+        if (!newCategory.id || !newCategory.title) {
+            alert('กรุณากรอก ID และชื่อหมวดหมู่');
+            return;
+        }
+        try {
+            const settingsRef = doc(db, 'voteSettings', 'config');
+            const newCategoryData: VoteCategory = {
+                id: newCategory.id,
+                title: newCategory.title,
+                description: newCategory.description || '',
+                isOpen: false,
+                openTime: null,
+                closeTime: null,
+                autoClose: false,
+                sessionId: `session_${Date.now()}`,
+            };
+
+            await setDoc(settingsRef, {
+                categories: {
+                    ...voteSettings,
+                    [newCategory.id]: newCategoryData
+                }
+            }, { merge: true });
+
+            alert(`เพิ่มหมวดหมู่ "${newCategory.title}" สำเร็จ!`);
+            setShowAddCategoryModal(false);
+            setNewCategory({ id: '', title: '', description: '' });
+        } catch (error) {
+            console.error('Error adding category:', error);
+            alert('เกิดข้อผิดพลาดในการเพิ่มหมวดหมู่');
+        }
+    };
+
+    const handleUpdateCategory = async (categoryId: string, updates: Partial<VoteCategory>) => {
+        try {
+            const settingsRef = doc(db, 'voteSettings', 'config');
+            const updatedCategory = {
+                ...voteSettings[categoryId],
+                ...updates,
+            };
+
+            await setDoc(settingsRef, {
+                categories: {
+                    ...voteSettings,
+                    [categoryId]: updatedCategory
+                }
+            }, { merge: true });
+
+            alert('อัพเดทหมวดหมู่สำเร็จ!');
+            setEditingCategory(null);
+        } catch (error) {
+            console.error('Error updating category:', error);
+            alert('เกิดข้อผิดพลาดในการอัพเดทหมวดหมู่');
+        }
+    };
+
+    const handleDeleteCategory = async (categoryId: string) => {
+        if (!confirm(`ต้องการลบหมวดหมู่ "${voteSettings[categoryId]?.title}" หรือไม่?`)) return;
+        try {
+            const settingsRef = doc(db, 'voteSettings', 'config');
+            const updatedCategories = { ...voteSettings };
+            delete updatedCategories[categoryId];
+
+            await setDoc(settingsRef, {
+                categories: updatedCategories
+            }, { merge: true });
+
+            alert('ลบหมวดหมู่สำเร็จ!');
+        } catch (error) {
+            console.error('Error deleting category:', error);
+            alert('เกิดข้อผิดพลาดในการลบหมวดหมู่');
         }
     };
 
@@ -287,7 +404,6 @@ export default function Admin() {
 
     return (
         <div className="min-h-screen bg-gray-100 pb-24">
-            {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 shadow-lg">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div>
@@ -306,7 +422,6 @@ export default function Admin() {
             </div>
 
             <div className="max-w-7xl mx-auto p-6">
-                {/* Tab Navigation (for Admin/SuperAdmin only) */}
                 {canManageUsers && (
                     <div className="flex gap-2 mb-6">
                         <button
@@ -328,6 +443,16 @@ export default function Admin() {
                             }`}
                         >
                             👥 จัดการผู้ใช้
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('categories')}
+                            className={`flex-1 py-4 rounded-xl font-bold transition-all ${
+                                activeTab === 'categories'
+                                    ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg'
+                                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                            }`}
+                        >
+                            📋 จัดการหมวดหมู่
                         </button>
                     </div>
                 )}
@@ -494,205 +619,266 @@ export default function Admin() {
                                 )}
                             </div>
                         )}
-
-                        <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                            <div className="text-sm text-blue-800">
-                                <strong>ℹ️ หมายเหตุ:</strong>
-                                <ul className="list-disc ml-4 mt-2 space-y-1">
-                                    <li>👤 <strong>User</strong>: ผู้ใช้ทั่วไป</li>
-                                    <li>🔧 <strong>Staff</strong>: สแกน QR + จัดการระบบโหวต</li>
-                                    <li>📋 <strong>Register</strong>: เช็คเข้างานเท่านั้น (ไม่มีสิทธิ์อื่น)</li>
-                                    <li>🛡️ <strong>Admin</strong>: จัดการระบบโหวต + จัดการผู้ใช้</li>
-                                    <li>👑 <strong>SuperAdmin</strong>: สิทธิ์เต็ม (เพิ่ม Admin ได้)</li>
-                                </ul>
-                                <div className="mt-3 pt-3 border-t border-blue-200">
-                                    <strong>📅 การเช็คเข้างาน:</strong>
-                                    <ul className="list-disc ml-4 mt-1 space-y-1">
-                                        <li><span className="text-blue-600">D1</span> = วันที่ 1</li>
-                                        <li><span className="text-green-600">D2</span> = วันที่ 2</li>
-                                        <li><span className="text-purple-600">D3</span> = วันที่ 3</li>
-                                    </ul>
-                                </div>
-                                <div className="mt-3 pt-3 border-t border-blue-200">
-                                    <strong>💎 Points:</strong>
-                                    <p className="ml-4 mt-1">คลิก <span className="bg-blue-500 text-white px-2 py-0.5 rounded text-xs">✏️ แก้</span> เพื่อแก้ไขคะแนน</p>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 )}
 
                 {/* Vote Management Panel */}
                 {activeTab === 'vote' && (
                     <>
-                {/* Vote Control Panel */}
-                <div className="bg-white rounded-2xl p-6 shadow-xl mb-6">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-4">🎛️ ควบคุมการโหวต</h2>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {Object.entries(voteSettings).map(([categoryId, category]) => {
-                            const categoryInfo = {
-                                band: { emoji: '🎸', name: 'Band' },
-                                solo: { emoji: '🎤', name: 'Solo' },
-                                cover: { emoji: '💃', name: 'Cover' }
-                            }[categoryId as 'band' | 'solo' | 'cover'] || { emoji: '📋', name: categoryId };
+                        <div className="bg-white rounded-2xl p-6 shadow-xl mb-6">
+                            <h2 className="text-2xl font-bold text-gray-800 mb-4">🎛️ ควบคุมการโหวต</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {Object.entries(voteSettings).map(([categoryId, category]) => {
+                                    const categoryInfo = {
+                                        band: { emoji: '🎸', name: 'Band' },
+                                        solo: { emoji: '🎤', name: 'Solo' },
+                                        cover: { emoji: '💃', name: 'Cover' }
+                                    }[categoryId] || { emoji: '📋', name: category.title };
 
-                            return (
-                                <div
-                                    key={categoryId}
-                                    className={`p-6 rounded-xl border-2 transition-all ${
-                                        category.isOpen
-                                            ? 'bg-green-50 border-green-400'
-                                            : 'bg-gray-50 border-gray-300'
-                                    }`}
-                                >
-                                    <div className="text-center mb-4">
-                                        <div className="text-4xl mb-2">{categoryInfo.emoji}</div>
-                                        <div className="font-bold text-gray-800">{categoryInfo.name}</div>
-                                        <div className="text-xs text-gray-500 mt-1">
-                                            Session: {category.sessionId}
+                                    return (
+                                        <div
+                                            key={categoryId}
+                                            className={`p-6 rounded-xl border-2 transition-all ${
+                                                category.isOpen
+                                                    ? 'bg-green-50 border-green-400'
+                                                    : 'bg-gray-50 border-gray-300'
+                                            }`}
+                                        >
+                                            <div className="text-center mb-4">
+                                                <div className="text-4xl mb-2">{categoryInfo.emoji}</div>
+                                                <div className="font-bold text-gray-800">{categoryInfo.name}</div>
+                                                <div className="text-xs text-gray-500 mt-1">
+                                                    Session: {category.sessionId}
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={() => toggleCategory(categoryId)}
+                                                className={`w-full py-3 rounded-xl font-bold transition-all shadow-lg ${
+                                                    category.isOpen
+                                                        ? 'bg-red-500 hover:bg-red-600 text-white'
+                                                        : 'bg-green-500 hover:bg-green-600 text-white'
+                                                }`}
+                                            >
+                                                {category.isOpen ? '🔴 ปิดการโหวต' : '▶️ เปิดการโหวต'}
+                                            </button>
+
+                                            <div className={`mt-3 text-center font-bold ${
+                                                category.isOpen ? 'text-green-600' : 'text-gray-500'
+                                            }`}>
+                                                {category.isOpen ? '✅ เปิดอยู่' : '⏸️ ปิดอยู่'}
+                                            </div>
                                         </div>
-                                    </div>
-
-                                    <button
-                                        onClick={() => toggleCategory(categoryId)}
-                                        className={`w-full py-3 rounded-xl font-bold transition-all shadow-lg ${
-                                            category.isOpen
-                                                ? 'bg-red-500 hover:bg-red-600 text-white'
-                                                : 'bg-green-500 hover:bg-green-600 text-white'
-                                        }`}
-                                    >
-                                        {category.isOpen ? '🔴 ปิดการโหวต' : '▶️ เปิดการโหวต'}
-                                    </button>
-
-                                    <div className={`mt-3 text-center font-bold ${
-                                        category.isOpen ? 'text-green-600' : 'text-gray-500'
-                                    }`}>
-                                        {category.isOpen ? '✅ เปิดอยู่' : '⏸️ ปิดอยู่'}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Candidate Management */}
-                <div className="bg-white rounded-2xl p-6 shadow-xl">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-2xl font-bold text-gray-800">👥 จัดการผู้สมัคร</h2>
-                        <button
-                            onClick={() => setShowAddModal(true)}
-                            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2 rounded-xl font-bold shadow-lg transition-all"
-                        >
-                            ➕ เพิ่มผู้สมัคร
-                        </button>
-                    </div>
-
-                    {/* Category Selector */}
-                    <div className="flex gap-2 mb-4">
-                        {['band', 'solo', 'cover'].map((cat) => {
-                            const info = {
-                                band: { emoji: '🎸', name: 'Band' },
-                                solo: { emoji: '🎤', name: 'Solo' },
-                                cover: { emoji: '💃', name: 'Cover' }
-                            }[cat];
-
-                            return (
-                                <button
-                                    key={cat}
-                                    onClick={() => setSelectedCategory(cat)}
-                                    className={`flex-1 py-3 rounded-xl font-bold transition-all ${
-                                        selectedCategory === cat
-                                            ? 'bg-gradient-to-br from-red-600 to-red-700 text-white shadow-lg'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    <div className="text-2xl mb-1">{info?.emoji}</div>
-                                    <div className="text-sm">{info?.name}</div>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Stats Summary */}
-                    <div className="bg-gradient-to-r from-red-50 to-amber-50 rounded-xl p-4 mb-4 border border-red-200">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <div className="text-sm text-gray-600">ผู้สมัครทั้งหมด</div>
-                                <div className="text-2xl font-bold text-gray-800">{candidates.length} คน</div>
-                            </div>
-                            <div>
-                                <div className="text-sm text-gray-600">โหวตทั้งหมด</div>
-                                <div className="text-2xl font-bold text-red-600">{totalVotes} โหวต</div>
+                                    );
+                                })}
                             </div>
                         </div>
-                    </div>
 
-                    {/* Candidates Table */}
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="border-b-2 border-gray-200">
-                                    <th className="text-left p-3 font-bold text-gray-700">#</th>
-                                    <th className="text-left p-3 font-bold text-gray-700">ชื่อ</th>
-                                    <th className="text-left p-3 font-bold text-gray-700">คำอธิบาย</th>
-                                    <th className="text-center p-3 font-bold text-gray-700">โหวต</th>
-                                    <th className="text-center p-3 font-bold text-gray-700">จัดการ</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {candidates.map((candidate, index) => (
-                                    <tr key={candidate.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                        <td className="p-3 text-gray-600">#{index + 1}</td>
-                                        <td className="p-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-red-200 to-amber-200 flex-shrink-0">
-                                                    {candidate.imageUrl ? (
-                                                        <img 
-                                                            src={candidate.imageUrl} 
-                                                            alt={candidate.name}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-2xl">
-                                                            {candidate.category === 'band' && '�'}
-                                                            {candidate.category === 'solo' && '�'}
-                                                            {candidate.category === 'cover' && '�'}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="font-medium text-gray-800">{candidate.name}</div>
-                                            </div>
-                                        </td>
-                                        <td className="p-3 text-sm text-gray-600 max-w-xs truncate">
-                                            {candidate.description}
-                                        </td>
-                                        <td className="p-3 text-center">
-                                            <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full font-bold">
-                                                {candidate.voteCount}
-                                            </span>
-                                        </td>
-                                        <td className="p-3 text-center">
-                                            <button
-                                                onClick={() => handleDeleteCandidate(candidate.id, candidate.name)}
-                                                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg font-bold transition-colors"
-                                            >
-                                                🗑️ ลบ
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-
-                        {candidates.length === 0 && (
-                            <div className="text-center py-12 text-gray-500">
-                                ยังไม่มีผู้สมัครในหมวดนี้
+                        <div className="bg-white rounded-2xl p-6 shadow-xl">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-2xl font-bold text-gray-800">👥 จัดการผู้สมัคร</h2>
+                                <button
+                                    onClick={() => setShowAddModal(true)}
+                                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2 rounded-xl font-bold shadow-lg transition-all"
+                                >
+                                    ➕ เพิ่มผู้สมัคร
+                                </button>
                             </div>
-                        )}
-                    </div>
-                </div>
-                </>
+
+                            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                                {Object.keys(voteSettings).map((cat) => {
+                                    const info = {
+                                        band: { emoji: '🎸', name: 'Band' },
+                                        solo: { emoji: '🎤', name: 'Solo' },
+                                        cover: { emoji: '💃', name: 'Cover' }
+                                    }[cat] || { emoji: '📋', name: voteSettings[cat].title };
+
+                                    return (
+                                        <button
+                                            key={cat}
+                                            onClick={() => setSelectedCategory(cat)}
+                                            className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all whitespace-nowrap ${
+                                                selectedCategory === cat
+                                                    ? 'bg-gradient-to-br from-red-600 to-red-700 text-white shadow-lg'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            <div className="text-xl mb-1 text-center">{info.emoji}</div>
+                                            <div className="text-sm text-center">{info.name}</div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="bg-gradient-to-r from-red-50 to-amber-50 rounded-xl p-4 mb-4 border border-red-200">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <div className="text-sm text-gray-600">ผู้สมัครทั้งหมด</div>
+                                        <div className="text-2xl font-bold text-gray-800">{candidates.length} คน</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-sm text-gray-600">โหวตทั้งหมด</div>
+                                        <div className="text-2xl font-bold text-red-600">{totalVotes} โหวต</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b-2 border-gray-200">
+                                            <th className="text-left p-3 font-bold text-gray-700">#</th>
+                                            <th className="text-left p-3 font-bold text-gray-700">Sheet ID</th>
+                                            <th className="text-left p-3 font-bold text-gray-700">ชื่อ</th>
+                                            <th className="text-left p-3 font-bold text-gray-700">คำอธิบาย</th>
+                                            <th className="text-center p-3 font-bold text-gray-700">โหวต</th>
+                                            <th className="text-center p-3 font-bold text-gray-700">จัดการ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {candidates.map((candidate, index) => (
+                                            <tr key={candidate.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                                <td className="p-3 text-gray-600">#{index + 1}</td>
+                                                <td className="p-3">
+                                                    <span className="bg-gray-200 px-2 py-1 rounded text-sm font-mono">
+                                                        {candidate.sheetId || '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-red-200 to-amber-200 flex-shrink-0">
+                                                            {candidate.imageUrl ? (
+                                                                <img 
+                                                                    src={candidate.imageUrl} 
+                                                                    alt={candidate.name}
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-2xl">
+                                                                    {candidate.category === 'band' && '🎸'}
+                                                                    {candidate.category === 'solo' && '🎤'}
+                                                                    {candidate.category === 'cover' && '💃'}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="font-medium text-gray-800">{candidate.name}</div>
+                                                    </div>
+                                                </td>
+                                                <td className="p-3 text-sm text-gray-600 max-w-xs truncate">
+                                                    {candidate.description}
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full font-bold">
+                                                        {candidate.voteCount}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    <button
+                                                        onClick={() => handleDeleteCandidate(candidate.id, candidate.name)}
+                                                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg font-bold transition-colors"
+                                                    >
+                                                        🗑️ ลบ
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+
+                                {candidates.length === 0 && (
+                                    <div className="text-center py-12 text-gray-500">
+                                        ยังไม่มีผู้สมัครในหมวดนี้
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {/* Categories Management Tab */}
+                {activeTab === 'categories' && (
+                    <>
+                        <div className="mb-6">
+                            <button
+                                onClick={() => setShowAddCategoryModal(true)}
+                                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-3 px-6 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2"
+                            >
+                                <i className="ri-add-circle-line text-xl"></i>
+                                เพิ่มหมวดหมู่ใหม่
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {Object.entries(voteSettings).map(([categoryId, category]) => {
+                                const categoryEmoji = category.emoji || {
+                                    band: '🎸',
+                                    solo: '🎤',
+                                    cover: '💃'
+                                }[categoryId] || '📋';
+
+                                return (
+                                    <div key={categoryId} className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all border-2 border-gray-100">
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="flex-1">
+                                                {editingCategory === categoryId ? (
+                                                    <input
+                                                        type="text"
+                                                        defaultValue={category.title}
+                                                        onBlur={(e) => {
+                                                            if (e.target.value !== category.title) {
+                                                                handleUpdateCategory(categoryId, { title: e.target.value });
+                                                            }
+                                                        }}
+                                                        className="text-xl font-bold text-gray-800 border-2 border-purple-500 rounded-lg px-2 py-1 w-full"
+                                                        autoFocus
+                                                    />
+                                                ) : (
+                                                    <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                                        <span className="text-3xl">{categoryEmoji}</span>
+                                                        {category.title}
+                                                    </h3>
+                                                )}
+                                                <p className="text-gray-600 text-sm mt-1">
+                                                    ID: <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">{categoryId}</span>
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => setEditingCategory(editingCategory === categoryId ? null : categoryId)}
+                                                className="text-gray-400 hover:text-purple-600 transition-colors"
+                                            >
+                                                <i className={editingCategory === categoryId ? "ri-check-line text-xl" : "ri-edit-line text-xl"}></i>
+                                            </button>
+                                        </div>
+
+                                        {editingCategory === categoryId ? (
+                                            <textarea
+                                                defaultValue={category.description}
+                                                onBlur={(e) => {
+                                                    if (e.target.value !== category.description) {
+                                                        handleUpdateCategory(categoryId, { description: e.target.value });
+                                                    }
+                                                }}
+                                                className="text-gray-600 text-sm mb-4 border-2 border-purple-500 rounded-lg px-2 py-1 w-full"
+                                                rows={2}
+                                            />
+                                        ) : (
+                                            <p className="text-gray-600 text-sm mb-4">{category.description || 'ไม่มีคำอธิบาย'}</p>
+                                        )}
+
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleDeleteCategory(categoryId)}
+                                                disabled={loading}
+                                                className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-bold transition-all disabled:opacity-50 flex-1"
+                                            >
+                                                ลบหมวดหมู่
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </>
                 )}
             </div>
 
@@ -714,10 +900,27 @@ export default function Admin() {
                                     onChange={(e) => setSelectedCategory(e.target.value)}
                                     className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none"
                                 >
-                                    <option value="band">� Band</option>
-                                    <option value="solo">� Solo</option>
-                                    <option value="cover">� Cover</option>
+                                    {Object.keys(voteSettings).map(cat => (
+                                        <option key={cat} value={cat}>{voteSettings[cat].title}</option>
+                                    ))}
                                 </select>
+                            </div>
+
+                            {/* ✅ 4. เพิ่มช่องกรอก Sheet ID */}
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    Sheet ID (ลำดับ ID ใน Excel) *
+                                </label>
+                                <input
+                                    type="number"
+                                    value={newCandidate.sheetId}
+                                    onChange={(e) => setNewCandidate({ ...newCandidate, sheetId: e.target.value })}
+                                    className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none font-mono"
+                                    placeholder="เช่น 1, 2, 3..."
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    * ใส่เลขให้ตรงกับ Column A ใน Google Sheet เพื่อให้ตัดคะแนนถูกคน
+                                </p>
                             </div>
 
                             <div>
@@ -764,7 +967,7 @@ export default function Admin() {
                             <button
                                 onClick={() => {
                                     setShowAddModal(false);
-                                    setNewCandidate({ name: '', description: '', imageUrl: '' });
+                                    setNewCandidate({ name: '', description: '', imageUrl: '', sheetId: '' }); // ✅ รีเซ็ตค่า
                                 }}
                                 className="flex-1 py-3 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-xl font-bold transition-colors"
                             >
@@ -776,6 +979,89 @@ export default function Admin() {
                             >
                                 ✓ เพิ่มผู้สมัคร
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Category Modal */}
+            {showAddCategoryModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                <i className="ri-add-circle-line text-green-600"></i>
+                                เพิ่มหมวดหมู่ใหม่
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowAddCategoryModal(false);
+                                    setNewCategory({ id: '', title: '', description: '' });
+                                }}
+                                className="text-gray-400 hover:text-gray-600"
+                            >
+                                <i className="ri-close-line text-2xl"></i>
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    ID หมวดหมู่ (ภาษาอังกฤษ, ไม่มีช่องว่าง)
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="เช่น president, bestdancer"
+                                    value={newCategory.id}
+                                    onChange={(e) => setNewCategory({ ...newCategory, id: e.target.value.toLowerCase().replace(/\s/g, '') })}
+                                    className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none font-mono"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    ชื่อหมวดหมู่ (ที่แสดงบนหน้าเว็บ)
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="เช่น ประธาน, นักเต้นยอดเยี่ยม"
+                                    value={newCategory.title}
+                                    onChange={(e) => setNewCategory({ ...newCategory, title: e.target.value })}
+                                    className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    คำอธิบาย (ไม่บังคับ)
+                                </label>
+                                <textarea
+                                    placeholder="อธิบายเพิ่มเติมเกี่ยวกับหมวดหมู่นี้"
+                                    value={newCategory.description}
+                                    onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
+                                    className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none"
+                                    rows={3}
+                                />
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => {
+                                        setShowAddCategoryModal(false);
+                                        setNewCategory({ id: '', title: '', description: '' });
+                                    }}
+                                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-xl font-bold transition-all"
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    onClick={handleAddCategory}
+                                    disabled={loading || !newCategory.id || !newCategory.title}
+                                    className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-3 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? 'กำลังเพิ่ม...' : 'เพิ่มหมวดหมู่'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

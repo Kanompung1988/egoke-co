@@ -2,14 +2,17 @@ import { useState, useEffect } from 'react';
 import { 
     collection, 
     doc, 
+    getDoc, 
     getDocs, 
     setDoc, 
     updateDoc, 
     increment, 
     query, 
-    where,
-    onSnapshot,
-    Timestamp 
+    where, 
+    onSnapshot, 
+    Timestamp,
+    writeBatch, 
+    serverTimestamp 
 } from 'firebase/firestore';
 import { db, auth } from '../firebaseApp';
 
@@ -23,6 +26,7 @@ export interface VoteCategory {
     closeTime: Timestamp | null;
     autoClose: boolean;
     sessionId: string;
+    sheetId?: number | string;
 }
 
 export interface Candidate {
@@ -34,6 +38,7 @@ export interface Candidate {
     imageUrl: string;
     voteCount: number;
     order: number;
+    sheetId?: number | string;
 }
 
 export interface VoteRecord {
@@ -110,19 +115,14 @@ export function useUserVoteStatus(category: string, sessionId: string) {
             }
 
             try {
-                const votesRef = collection(db, 'votes');
-                const q = query(
-                    votesRef,
-                    where('userId', '==', user.uid),
-                    where('category', '==', category),
-                    where('sessionId', '==', sessionId)
-                );
+                // เช็คจาก userVotes collection เพื่อความแม่นยำ
+                const voteId = `${user.uid}_${sessionId}_${category}`;
+                const userVoteRef = doc(db, 'userVotes', voteId);
 
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    if (!snapshot.empty) {
-                        const voteDoc = snapshot.docs[0];
+                const unsubscribe = onSnapshot(userVoteRef, (docSnap) => {
+                    if (docSnap.exists()) {
                         setHasVoted(true);
-                        setVotedCandidateId(voteDoc.data().candidateId);
+                        setVotedCandidateId(docSnap.data().candidateId);
                     } else {
                         setHasVoted(false);
                         setVotedCandidateId(null);
@@ -143,61 +143,82 @@ export function useUserVoteStatus(category: string, sessionId: string) {
     return { hasVoted, votedCandidateId, loading };
 }
 
+// ✅ ฟังก์ชัน Submit Vote ที่ปรับปรุงแล้ว
 export async function submitVote(
     category: string,
     sessionId: string,
     candidate: Candidate
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; newVoteCount?: number }> {
     try {
         const user = auth.currentUser;
         if (!user) {
             return { success: false, error: 'กรุณาเข้าสู่ระบบก่อนโหวต' };
         }
 
-        console.log('🗳️ Submitting vote:', { category, sessionId, candidateId: candidate.id });
+        console.log(`🗳️ [Start] User ${user.displayName} is voting for ${candidate.name}...`);
 
-        // Check if already voted in this session
-        const votesRef = collection(db, 'votes');
-        const q = query(
-            votesRef,
-            where('userId', '==', user.uid),
-            where('category', '==', category),
-            where('sessionId', '==', sessionId)
-        );
-        const existingVotes = await getDocs(q);
+        const batch = writeBatch(db);
 
-        if (!existingVotes.empty) {
-            console.log('❌ User already voted in this session');
+        // 1. สร้าง Reference
+        const userVoteId = `${user.uid}_${sessionId}_${category}`;
+        const userVoteRef = doc(db, 'userVotes', userVoteId);
+        const voteRecordRef = doc(collection(db, 'votes'));
+        const candidateRef = doc(db, 'candidates', candidate.id);
+
+        // 2. ตรวจสอบก่อนว่าเคยโหวตไปหรือยัง (Client Check)
+        const userVoteSnap = await getDoc(userVoteRef);
+        if (userVoteSnap.exists()) {
+            console.warn('❌ User already voted in this session');
             return { success: false, error: 'คุณโหวตในหมวดนี้ไปแล้ว' };
         }
 
-        // Create vote record with unique ID
-        const voteId = `${user.uid}_${category}_${sessionId}`;
-        const voteData: VoteRecord = {
+        // 3. ใส่คำสั่งลงใน Batch (ทำงานพร้อมกัน)
+        
+        // A. บันทึกว่า User นี้โหวตแล้ว
+        batch.set(userVoteRef, {
+            userId: user.uid,
+            candidateId: candidate.id,
+            category: category,
+            sessionId: sessionId,
+            timestamp: serverTimestamp()
+        });
+
+        // B. สร้างประวัติการโหวต (สำหรับ Admin นับคะแนน)
+        batch.set(voteRecordRef, {
             userId: user.uid,
             userName: user.displayName || 'Anonymous',
             category,
             sessionId,
             candidateId: candidate.id,
             candidateName: candidate.name,
-            timestamp: Timestamp.now()
-        };
-
-        console.log('📝 Creating vote record:', voteId);
-
-        // Add vote with specific ID to prevent duplicates
-        await setDoc(doc(db, 'votes', voteId), voteData);
-
-        // Update candidate vote count
-        const candidateRef = doc(db, 'candidates', candidate.id);
-        await updateDoc(candidateRef, {
-            voteCount: increment(1),
-            lastVotedAt: Timestamp.now()
+            timestamp: serverTimestamp()
         });
 
-        console.log('✅ Vote submitted successfully');
+        // C. บวกคะแนนทีละ 1 (Atomic Increment)
+        batch.update(candidateRef, {
+            voteCount: increment(1),
+            lastVotedAt: serverTimestamp()
+        });
 
-        return { success: true };
+        // 4. Commit Batch
+        await batch.commit();
+
+        // 5. อ่านค่าคะแนนล่าสุดทันทีเพื่อส่งกลับไปอัปเดต Sheet
+        const updatedSnap = await getDoc(candidateRef);
+        const newVoteCount = updatedSnap.exists() ? updatedSnap.data().voteCount : 0;
+
+        // ---------------------------------------------------------
+        // 🐛 DEBUG LOG
+        // ---------------------------------------------------------
+        console.group("✅ VOTE SUCCESS DEBUG");
+        console.log(`👤 Voter: ${user.displayName} (${user.uid})`);
+        console.log(`🎸 Voted For: ${candidate.name}`);
+        console.log(`📊 Updated Score: ${newVoteCount}`);
+        console.groupEnd();
+        // ---------------------------------------------------------
+
+        return { success: true, newVoteCount };
+
     } catch (error) {
         console.error('❌ Error submitting vote:', error);
         const errorMessage = error instanceof Error ? error.message : 'เกิดข้อผิดพลาด';
@@ -238,8 +259,7 @@ export function useVoteStats(category: string) {
     return { totalVotes, topCandidate };
 }
 
-// ✅ Real-time Vote Logs for Admin
-export function useVoteLogs(category: string, limit: number = 50) {
+export function useVoteLogs(category: string, limitCount: number = 50) {
     const [logs, setLogs] = useState<VoteRecord[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -253,8 +273,7 @@ export function useVoteLogs(category: string, limit: number = 50) {
         const votesRef = collection(db, 'votes');
         const q = query(
             votesRef,
-            where('category', '==', category),
-            // orderBy('timestamp', 'desc') // Commented out to avoid index requirement
+            where('category', '==', category)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -263,20 +282,22 @@ export function useVoteLogs(category: string, limit: number = 50) {
                 ...doc.data()
             } as VoteRecord));
 
-            // Sort in memory instead
-            voteData.sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
+            voteData.sort((a, b) => {
+                const timeA = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
+                const timeB = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
+                return timeB - timeA;
+            });
             
-            setLogs(voteData.slice(0, limit));
+            setLogs(voteData.slice(0, limitCount));
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, [category, limit]);
+    }, [category, limitCount]);
 
     return { logs, loading };
 }
 
-// ✅ Real-time Vote Count for Admin Dashboard
 export function useRealTimeVoteCount(category: string, sessionId: string) {
     const [voteCount, setVoteCount] = useState(0);
     const [voters, setVoters] = useState<string[]>([]);

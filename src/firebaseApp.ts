@@ -24,6 +24,7 @@ import {
 } from "firebase/firestore";
 
 // ✅ ตั้งค่า Firebase จาก Environment Variables
+/*
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -32,6 +33,17 @@ const firebaseConfig = {
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
     appId: import.meta.env.VITE_FIREBASE_APP_ID,
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+};
+*/
+
+const firebaseConfig = {
+    apiKey: "AIzaSyDCjt8DfkKCsjc73Oaay851FYu8pG1-3TY",
+    authDomain: "egoke-7dae5.firebaseapp.com",
+    projectId: "egoke-7dae5",
+    storageBucket: "egoke-7dae5.appspot.com",
+    messagingSenderId: "910235640821",
+    appId: "1:910235640821:web:cc5163a4eee3e8dffc76bc",
+    measurementId: "G-10MPJ3TPEB",
 };
 
 // Validate Firebase config
