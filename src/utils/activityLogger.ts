@@ -221,3 +221,60 @@ export async function logWheelSpin(
     });
 }
 
+// Attendance check logging
+export async function logAttendanceCheck(
+    userId: string,
+    userEmail: string,
+    userName: string,
+    day: string,
+    checked: boolean,
+    checkedBy: string,
+    checkedByEmail: string,
+    points: number
+): Promise<void> {
+    await logActivity({
+        userId,
+        userEmail,
+        userName,
+        type: 'POINT_GRANT',
+        description: checked 
+            ? `เช็คเข้างาน ${day} โดย ${checkedByEmail}` 
+            : `ยกเลิกเช็คเข้างาน ${day} โดย ${checkedByEmail}`,
+        pointsBefore: points,
+        pointsAfter: points,
+        metadata: {
+            reason: `Attendance: ${day}`,
+            grantedBy: checkedBy,
+            grantedByEmail: checkedByEmail,
+            isAdminAction: true,
+        },
+    });
+}
+
+// Role change logging
+export async function logRoleChange(
+    userId: string,
+    userEmail: string,
+    userName: string,
+    oldRole: string,
+    newRole: string,
+    changedBy: string,
+    changedByEmail: string,
+    points: number
+): Promise<void> {
+    await logActivity({
+        userId,
+        userEmail,
+        userName,
+        type: 'ADMIN_ADJUST',
+        description: `เปลี่ยนยศจาก ${oldRole} เป็น ${newRole} โดย ${changedByEmail}`,
+        pointsBefore: points,
+        pointsAfter: points,
+        metadata: {
+            reason: `Role Change: ${oldRole} → ${newRole}`,
+            adjustedBy: changedBy,
+            adjustedByEmail: changedByEmail,
+            isAdminAction: true,
+        },
+    });
+}

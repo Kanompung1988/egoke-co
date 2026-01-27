@@ -6,7 +6,7 @@ import { db, getAllUsers, setUserRole, uploadImage } from '../firebaseApp';
 import { doc, updateDoc, collection, addDoc, deleteDoc, Timestamp, getDocs, query, where, setDoc, getDoc } from 'firebase/firestore';
 import BottomNav from '../components/BottomNav';
 import type { VoteCategory } from '../hooks/useVote'; // นำเข้า type ถ้ามี
-import { logAdminAdjustPoints } from '../utils/activityLogger';
+import { logAdminAdjustPoints, logAttendanceCheck } from '../utils/activityLogger';
 
 // ✅ 1. เพิ่ม sheetId และ imageFile ใน Interface
 interface CandidateForm {
@@ -163,9 +163,26 @@ export default function Admin() {
     const handleAttendanceChange = async (userId: string, day: 'day1' | 'day2' | 'day3', checked: boolean) => {
         try {
             const userRef = doc(db, 'users', userId);
+            
+            // ดึงข้อมูล user ก่อน
+            const userSnap = await getDoc(userRef);
+            const userData = userSnap.data();
+            
             await updateDoc(userRef, {
                 [`attendance.${day}`]: checked
             });
+            
+            // บันทึก activity log
+            await logAttendanceCheck(
+                userId,
+                userData?.email || '',
+                userData?.displayName || 'Unknown',
+                day,
+                checked,
+                currentUser?.uid || '',
+                currentUser?.email || '',
+                userData?.points || 0
+            );
             
             setUsers(users.map(u => 
                 u.uid === userId 

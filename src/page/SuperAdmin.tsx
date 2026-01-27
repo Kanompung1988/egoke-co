@@ -7,6 +7,7 @@ import { doc, setDoc, Timestamp } from 'firebase/firestore';
 import { useVoteSettings } from '../hooks/useVote';
 import type { VoteCategory } from '../hooks/useVote';
 import ActivityLogsViewer from '../components/ActivityLogsViewer';
+import { logRoleChange } from '../utils/activityLogger';
 
 interface UserData {
     uid: string;
@@ -103,10 +104,29 @@ export default function SuperAdmin() {
         setMessage('');
         
         try {
+            // ดึงข้อมูล user ก่อนเปลี่ยน role
+            const targetUser = users.find(u => u.email === targetEmail);
+            const oldRole = targetUser?.role || 'user';
+            
             const result = await setUserRole(targetEmail, targetRole);
             
             if (result.success) {
                 showSuccess(`อัพเดท ${targetEmail} เป็น ${targetRole} สำเร็จ!`);
+                
+                // บันทึก activity log
+                if (targetUser) {
+                    await logRoleChange(
+                        targetUser.uid,
+                        targetUser.email,
+                        targetUser.displayName,
+                        oldRole,
+                        targetRole,
+                        currentUser?.uid || '',
+                        currentUser?.email || '',
+                        targetUser.points
+                    );
+                }
+                
                 // รีโหลดรายชื่อ users
                 const allUsers = await getAllUsers();
                 setUsers(allUsers);

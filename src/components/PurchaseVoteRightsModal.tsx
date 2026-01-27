@@ -73,9 +73,9 @@ export default function PurchaseVoteRightsModal({
                 onClick={onClose}
             />
             
-            {/* Modal - ไม่ทับ Navbar - เพิ่ม pb-32 สำหรับ mobile */}
-            <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4 pb-32 sm:pb-4">
-                <div className="relative bg-gradient-to-br from-white to-amber-50/30 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-lg max-h-[calc(100vh-120px)] sm:max-h-[90vh] overflow-y-auto animate-slide-up">
+            {/* Modal - ไม่ทับ Navbar - ปรับ pb-24 เพื่อไม่ให้สูงเกิน */}
+            <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4 pb-24 sm:pb-4">
+                <div className="relative bg-gradient-to-br from-white to-amber-50/30 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-lg max-h-[calc(100vh-100px)] sm:max-h-[90vh] overflow-y-auto animate-slide-up">
                     {/* Header - Red to Gold Gradient */}
                     <div className="sticky top-0 bg-gradient-to-r from-red-600 via-red-700 to-amber-600 px-6 py-4 rounded-t-3xl sm:rounded-t-3xl shadow-xl">
                         <div className="flex items-center justify-between">
@@ -200,7 +200,11 @@ export default function PurchaseVoteRightsModal({
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-gray-700">สิทธิ์ใหม่:</span>
+                                    <span className="text-gray-700">สิทธิ์ที่ซื้อ:</span>
+                                    <span className="font-bold text-green-600 text-lg">+{rightsAmount} ครั้ง</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-700">สิทธิ์รวมทั้งหมด:</span>
                                     <span className="font-bold text-green-600 text-lg">{currentRights + rightsAmount} ครั้ง</span>
                                 </div>
                                 <div className="flex justify-between items-center">

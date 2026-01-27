@@ -109,32 +109,74 @@ export default function ActivityLogsViewer() {
 
     return (
         <div className="space-y-6">
-            {/* Statistics Summary */}
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg">
-                    <div className="text-3xl font-bold">{logs.length}</div>
-                    <div className="text-sm opacity-90">รายการทั้งหมด</div>
-                    <div className="text-xs opacity-75 mt-1">Total Logs</div>
+            {/* Enhanced Statistics Summary */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-2xl p-5 text-white shadow-xl transform hover:scale-105 transition-transform">
+                    <div className="text-sm font-semibold opacity-90 mb-1">รายการทั้งหมด</div>
+                    <div className="text-4xl font-bold mb-1">{logs.length}</div>
+                    <div className="text-xs opacity-75">Total Logs</div>
                 </div>
-                {Object.entries(LOG_TYPE_LABELS).map(([type, label]) => {
-                    const count = logs.filter(log => log.type === type).length;
-                    const colorClass = type === 'POINT_GRANT' ? 'from-green-500 to-green-600' :
-                                      type === 'POINT_DEDUCT' ? 'from-red-500 to-red-600' :
-                                      type === 'VOTE_CAST' ? 'from-blue-500 to-blue-600' :
-                                      type === 'VOTE_RIGHTS_PURCHASE' ? 'from-purple-500 to-purple-600' :
-                                      'from-amber-500 to-amber-600';
-                    return (
-                        <div key={type} className={`bg-gradient-to-br ${colorClass} rounded-2xl p-4 text-white shadow-lg`}>
-                            <div className="text-2xl mb-1">{LOG_TYPE_EMOJI[type as keyof typeof LOG_TYPE_EMOJI]}</div>
-                            <div className="text-2xl font-bold">{count}</div>
-                            <div className="text-xs opacity-90">{label}</div>
-                        </div>
-                    );
-                })}
+                
+                <div className="bg-gradient-to-br from-green-500 via-green-600 to-emerald-600 rounded-2xl p-5 text-white shadow-xl transform hover:scale-105 transition-transform">
+                    <div className="text-2xl mb-1">💰</div>
+                    <div className="text-3xl font-bold">{logs.filter(log => log.type === 'POINT_GRANT').length}</div>
+                    <div className="text-xs opacity-90">เพิ่มแต้ม</div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-red-500 via-red-600 to-rose-600 rounded-2xl p-5 text-white shadow-xl transform hover:scale-105 transition-transform">
+                    <div className="text-2xl mb-1">💸</div>
+                    <div className="text-3xl font-bold">{logs.filter(log => log.type === 'POINT_DEDUCT').length}</div>
+                    <div className="text-xs opacity-90">หักแต้ม</div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-blue-400 via-blue-500 to-cyan-600 rounded-2xl p-5 text-white shadow-xl transform hover:scale-105 transition-transform">
+                    <div className="text-2xl mb-1">🗳️</div>
+                    <div className="text-3xl font-bold">{logs.filter(log => log.type === 'VOTE_CAST').length}</div>
+                    <div className="text-xs opacity-90">โหวต</div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-purple-500 via-purple-600 to-violet-600 rounded-2xl p-5 text-white shadow-xl transform hover:scale-105 transition-transform">
+                    <div className="text-2xl mb-1">🎫</div>
+                    <div className="text-3xl font-bold">{logs.filter(log => log.type === 'VOTE_RIGHTS_PURCHASE').length}</div>
+                    <div className="text-xs opacity-90">ซื้อสิทธิ์</div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 rounded-2xl p-5 text-white shadow-xl transform hover:scale-105 transition-transform">
+                    <div className="text-2xl mb-1">🎁</div>
+                    <div className="text-3xl font-bold">{logs.filter(log => log.type === 'PRIZE_CLAIM').length}</div>
+                    <div className="text-xs opacity-90">แลกของรางวัล</div>
+                </div>
+            </div>
+            
+            {/* Additional Stats Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-gradient-to-br from-pink-500 via-pink-600 to-rose-600 rounded-xl p-4 text-white shadow-lg">
+                    <div className="text-xl mb-1">🎰</div>
+                    <div className="text-2xl font-bold">{logs.filter(log => log.type === 'GAME_SPIN').length}</div>
+                    <div className="text-xs opacity-90">หมุนวงล้อ</div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 rounded-xl p-4 text-white shadow-lg">
+                    <div className="text-xl mb-1">👨‍💼</div>
+                    <div className="text-2xl font-bold">{logs.filter(log => log.type === 'ADMIN_ADJUST').length}</div>
+                    <div className="text-xs opacity-90">ปรับแต้ม</div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-teal-500 via-teal-600 to-cyan-600 rounded-xl p-4 text-white shadow-lg">
+                    <div className="text-xl mb-1">👥</div>
+                    <div className="text-2xl font-bold">{new Set(logs.map(log => log.userId)).size}</div>
+                    <div className="text-xs opacity-90">ผู้ใช้ที่มีกิจกรรม</div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 rounded-xl p-4 text-white shadow-lg">
+                    <div className="text-xl mb-1">📈</div>
+                    <div className="text-2xl font-bold">{logs.filter(log => log.metadata?.isAdminAction).length}</div>
+                    <div className="text-xs opacity-90">กิจกรรมโดย Admin</div>
+                </div>
             </div>
 
             {/* Header & Controls */}
-            <div className="bg-white rounded-2xl p-6 shadow-lg">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-gray-100">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                     <div>
                         <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
