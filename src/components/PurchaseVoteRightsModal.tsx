@@ -73,9 +73,9 @@ export default function PurchaseVoteRightsModal({
                 onClick={onClose}
             />
             
-            {/* Modal - ไม่ทับ Navbar */}
-            <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4 pb-20 sm:pb-4">
-                <div className="relative bg-gradient-to-br from-white to-amber-50/30 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-lg max-h-[calc(100vh-100px)] sm:max-h-[90vh] overflow-y-auto animate-slide-up">
+            {/* Modal - ไม่ทับ Navbar - เพิ่ม pb-32 สำหรับ mobile */}
+            <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4 pb-32 sm:pb-4">
+                <div className="relative bg-gradient-to-br from-white to-amber-50/30 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-lg max-h-[calc(100vh-120px)] sm:max-h-[90vh] overflow-y-auto animate-slide-up">
                     {/* Header - Red to Gold Gradient */}
                     <div className="sticky top-0 bg-gradient-to-r from-red-600 via-red-700 to-amber-600 px-6 py-4 rounded-t-3xl sm:rounded-t-3xl shadow-xl">
                         <div className="flex items-center justify-between">
@@ -210,8 +210,8 @@ export default function PurchaseVoteRightsModal({
                             </div>
                         </div>
 
-                        {/* Action Buttons - Red to Gold Theme */}
-                        <div className="grid grid-cols-2 gap-3 pt-2">
+                        {/* Action Buttons - Red to Gold Theme - เพิ่ม pb เพื่อไม่ทับ Bottom Nav */}
+                        <div className="grid grid-cols-2 gap-3 pt-2 pb-4">
                             <button
                                 className="py-4 bg-gradient-to-br from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 rounded-2xl font-bold text-lg shadow-md transition-all active:scale-95 disabled:opacity-50 border-2 border-gray-300"
                                 onClick={onClose}
