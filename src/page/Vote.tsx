@@ -439,76 +439,7 @@ export default function Vote() {
                         </div>
                     )}
 
-                    {/* Vote Rights Info Card - Show when voting is closed */}
-                    {!isOpen && (
-                        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl mb-4 animate-fade-in overflow-hidden border-2 border-blue-100">
-                            {/* Header */}
-                            <div className="bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-50 px-6 py-8 text-center border-b border-blue-100">
-                                <div className="relative inline-block mb-4">
-                                    <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-100 to-cyan-100 rounded-3xl flex items-center justify-center shadow-xl">
-                                        <span className="text-5xl">🎫</span>
-                                    </div>
-                                </div>
-                                <h3 className="text-3xl font-bold bg-gradient-to-r from-blue-700 to-cyan-700 bg-clip-text text-transparent mb-2">
-                                    สิทธิ์โหวตของคุณ
-                                </h3>
-                                <p className="text-gray-600 text-sm">
-                                    หมวด {CATEGORIES.find(c => c.id === selectedCategory)?.name}
-                                </p>
-                            </div>
-
-                            {/* Vote Rights Display */}
-                            <div className="px-6 py-6">
-                                <div className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl p-6 text-white text-center mb-4">
-                                    <div className="text-sm opacity-90 mb-2">สิทธิ์โหวตคงเหลือ</div>
-                                    <div className="text-6xl font-bold mb-2">{currentCategoryRights}</div>
-                                    <div className="text-sm opacity-90">ครั้ง</div>
-                                </div>
-
-                                {/* Vote History */}
-                                {voteHistory.length > 0 && (
-                                    <div className="mb-4">
-                                        <h4 className="font-bold text-gray-700 mb-3">ประวัติการโหวต ({voteHistory.length} ครั้ง)</h4>
-                                        <div className="space-y-2 max-h-60 overflow-y-auto">
-                                            {voteHistory.slice().reverse().map((vote, idx) => (
-                                                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-2xl">{vote.voteType === 'free' ? '🆓' : '🎫'}</span>
-                                                        <div>
-                                                            <div className="font-semibold text-sm">{vote.candidateName}</div>
-                                                            <div className="text-xs text-gray-500">
-                                                                {vote.voteType === 'free' ? 'โหวตฟรี' : 'ใช้สิทธิ์ที่ซื้อ'}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-xs text-gray-400">
-                                                        {vote.votedAt?.toDate?.()?.toLocaleString('th-TH', { 
-                                                            month: 'short', 
-                                                            day: 'numeric',
-                                                            hour: '2-digit',
-                                                            minute: '2-digit'
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Purchase Button */}
-                                <button
-                                    onClick={() => setShowPurchaseModal(true)}
-                                    className="w-full py-4 rounded-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
-                                >
-                                    <span className="text-2xl">🛒</span>
-                                    <span>ซื้อสิทธิ์โหวตเพิ่ม</span>
-                                </button>
-                                <p className="text-center text-sm text-gray-500 mt-2">
-                                    15 แต้ม = 1 สิทธิ์โหวต
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                    {/* ลบ Modal "สิทธิ์โหวตของคุณ" ออก - ซ้ำกับด้านล่าง */}
 
                     {/* Status Info - Beautiful Coming Soon Modal */}
                     {!isOpen && currentCategoryRights > 0 && (
@@ -590,71 +521,6 @@ export default function Vote() {
                         </div>
                     )}
 
-                    {/* Vote Rights Info - Replace "Already Voted" section */}
-                    {!isOpen && (
-                        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl mb-4 animate-fade-in overflow-hidden border-2 border-blue-100">
-                            {/* Header */}
-                            <div className="bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-50 px-6 py-8 text-center border-b border-blue-100">
-                                <div className="relative inline-block mb-4">
-                                    <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-100 to-cyan-100 rounded-3xl flex items-center justify-center shadow-xl">
-                                        <span className="text-5xl">�</span>
-                                    </div>
-                                </div>
-                                <h3 className="text-3xl font-bold bg-gradient-to-r from-blue-700 to-cyan-700 bg-clip-text text-transparent mb-2">
-                                    สิทธิ์โหวตของคุณ
-                                </h3>
-                                <p className="text-gray-600 text-sm">
-                                    คุณมีสิทธิ์โหวต {currentCategoryRights} ครั้ง ในหมวดนี้
-                                </p>
-                            </div>
-
-                            {/* Categories Status */}
-                            <div className="px-6 py-6 space-y-3">
-                                {CATEGORIES.map((cat) => {
-                                    const settings = voteSettings[cat.id];
-                                    const isCategoryOpen = settings?.isOpen || false;
-
-                                    return (
-                                        <div key={cat.id} className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm">
-                                            <div className="text-4xl">{cat.emoji}</div>
-                                            <div className="flex-1">
-                                                <div className="font-bold text-gray-800">{cat.name}</div>
-                                                <div className="text-sm text-gray-500">{cat.description}</div>
-                                            </div>
-                                            <div className={`px-3 py-1 rounded-full text-xs font-bold ${isCategoryOpen
-                                                ? 'bg-green-100 text-green-700'
-                                                : 'bg-gray-100 text-gray-500'
-                                                }`}>
-                                                {isCategoryOpen ? '✓ เปิด' : 'ปิด'}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Button */}
-                            <div className="px-6 pb-6">
-                                <button
-                                    onClick={() => setShowVoteSuccess(true)}
-                                    className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 text-white py-4 rounded-2xl font-bold shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
-                                >
-                                    <span className="text-2xl">📊</span>
-                                    <span>ดูผลโหวตของคุณ</span>
-                                </button>
-                            </div>
-
-                            {/* Footer */}
-                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-t border-green-100">
-                                <div className="flex items-center justify-center gap-2 text-green-700">
-                                    <span className="text-xl">✓</span>
-                                    <div className="text-sm">
-                                        <div className="font-bold">คุณโหวตแล้ว!</div>
-                                        <div className="text-xs text-green-600">ขอบคุณมากครับ - ระบบทำงานใช้งาน</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
                     {/* Loading State */}
                     {isLoading && (
