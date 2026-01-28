@@ -62,17 +62,21 @@ export default function ActivityLogsViewer() {
 
     // Export to CSV
     const exportToCSV = () => {
-        const headers = ['เวลา', 'ประเภท', 'อีเมล', 'ชื่อ', 'รายละเอียด', 'แต้มก่อน', 'แต้มหลัง', 'เปลี่ยนแปลง'];
-        const rows = filteredLogs.map(log => [
-            log.timestamp?.toDate?.()?.toLocaleString('th-TH') || '',
-            LOG_TYPE_LABELS[log.type],
-            log.userEmail,
-            log.userName,
-            log.description,
-            log.pointsBefore,
-            log.pointsAfter,
-            log.pointsChange,
-        ]);
+        const headers = ['เวลา', 'ประเภท', 'อีเมล', 'ชื่อ', 'รายละเอียด', 'ดำเนินการโดย', 'แต้มก่อน', 'แต้มหลัง', 'เปลี่ยนแปลง'];
+        const rows = filteredLogs.map(log => {
+            const actionBy = log.metadata?.adjustedByEmail || log.metadata?.claimedByEmail || log.metadata?.grantedByEmail || 'ผู้ใช้เอง';
+            return [
+                log.timestamp?.toDate?.()?.toLocaleString('th-TH') || '',
+                LOG_TYPE_LABELS[log.type],
+                log.userEmail,
+                log.userName,
+                log.description,
+                actionBy,
+                log.pointsBefore,
+                log.pointsAfter,
+                log.pointsChange,
+            ];
+        });
 
         const csvContent = [
             headers.join(','),
@@ -251,6 +255,7 @@ export default function ActivityLogsViewer() {
                                 <th className="w-32">ประเภท</th>
                                 <th>ผู้ใช้</th>
                                 <th>รายละเอียด</th>
+                                <th>ดำเนินการโดย</th>
                                 <th className="text-right">แต้มก่อน</th>
                                 <th className="text-right">แต้มหลัง</th>
                                 <th className="text-right">เปลี่ยนแปลง</th>
@@ -259,7 +264,7 @@ export default function ActivityLogsViewer() {
                         <tbody>
                             {paginatedLogs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="text-center py-8 text-gray-500">
+                                    <td colSpan={8} className="text-center py-8 text-gray-500">
                                         ไม่พบข้อมูล
                                     </td>
                                 </tr>
@@ -285,6 +290,26 @@ export default function ActivityLogsViewer() {
                                             <div className="text-xs text-gray-500">{log.userEmail}</div>
                                         </td>
                                         <td className="text-sm">{log.description}</td>
+                                        <td className="text-sm">
+                                            {log.metadata?.adjustedByEmail ? (
+                                                <div>
+                                                    <div className="font-medium text-orange-700">👨‍💼 Admin</div>
+                                                    <div className="text-xs text-gray-500">{log.metadata.adjustedByEmail}</div>
+                                                </div>
+                                            ) : log.metadata?.claimedByEmail ? (
+                                                <div>
+                                                    <div className="font-medium text-purple-700">👨‍💼 Staff</div>
+                                                    <div className="text-xs text-gray-500">{log.metadata.claimedByEmail}</div>
+                                                </div>
+                                            ) : log.metadata?.grantedByEmail ? (
+                                                <div>
+                                                    <div className="font-medium text-blue-700">👨‍💼 Staff</div>
+                                                    <div className="text-xs text-gray-500">{log.metadata.grantedByEmail}</div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-gray-400 text-xs">ผู้ใช้เอง</div>
+                                            )}
+                                        </td>
                                         <td className="text-right font-mono text-sm">{log.pointsBefore}</td>
                                         <td className="text-right font-mono text-sm">{log.pointsAfter}</td>
                                         <td className="text-right font-mono text-sm">

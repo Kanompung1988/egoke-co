@@ -51,6 +51,8 @@ export interface ActivityLog {
         grantedByEmail?: string;
         adjustedBy?: string;
         adjustedByEmail?: string;
+        claimedBy?: string;
+        claimedByEmail?: string;
         reason?: string;
         prizeId?: string;
         prizeName?: string;

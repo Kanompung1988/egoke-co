@@ -5,7 +5,7 @@ import { db, addPointsToUser } from '../firebaseApp';
 import { useAuth } from '../hooks/useAuth';
 import BottomNav from '../components/BottomNav';
 import QrScanner from '../components/QrScanner';
-import { logAdminAdjustPoints } from '../utils/activityLogger';
+import { logAdminAdjustPoints, logPrizeClaim } from '../utils/activityLogger';
 
 interface LastTransaction {
     userName: string;
@@ -228,6 +228,11 @@ export default function QRScan() {
         setError('');
         
         try {
+            let claimedUserId = '';
+            let claimedUserEmail = '';
+            let claimedUserName = '';
+            let userPoints = 0;
+
             // อัพเดทสถานะว่า claimed แล้ว
             const usersRef = collection(db, 'users');
             const usersSnapshot = await getDocs(usersRef);
@@ -244,6 +249,27 @@ export default function QRScan() {
                         claimedAt: Date.now(),
                         claimedBy: currentUser?.uid
                     });
+
+                    // Get user data for logging
+                    const userData = userDoc.data();
+                    claimedUserId = userDoc.id;
+                    claimedUserEmail = userData.email || '';
+                    claimedUserName = userData.displayName || scannedTicket.userName;
+                    userPoints = userData.points || 0;
+
+                    // Log prize claim activity with staff/admin info
+                    await logPrizeClaim(
+                        claimedUserId,
+                        claimedUserEmail,
+                        claimedUserName,
+                        scannedTicket.ticketId || '',
+                        scannedTicket.prize,
+                        userPoints, // pointsBefore
+                        userPoints, // pointsAfter (no change)
+                        currentUser?.uid,
+                        currentUser?.email || ''
+                    );
+                    
                     break;
                 }
             }

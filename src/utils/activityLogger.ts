@@ -146,19 +146,24 @@ export async function logPrizeClaim(
     prizeId: string,
     prizeName: string,
     pointsBefore: number,
-    pointsAfter: number
+    pointsAfter: number,
+    claimedBy?: string,
+    claimedByEmail?: string
 ): Promise<void> {
     await logActivity({
         userId,
         userEmail,
         userName,
         type: 'PRIZE_CLAIM',
-        description: `แลกของรางวัล: ${prizeName}`,
+        description: `แลกของรางวัล: ${prizeName}${claimedBy ? ` (เคลมโดย: ${claimedByEmail})` : ''}`,
         pointsBefore,
         pointsAfter,
         metadata: {
             prizeId,
             prizeName,
+            claimedBy,
+            claimedByEmail,
+            isAdminAction: !!claimedBy,
         },
     });
 }
