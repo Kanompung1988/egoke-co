@@ -7,6 +7,7 @@ import { doc, updateDoc, collection, addDoc, deleteDoc, Timestamp, getDocs, quer
 import BottomNav from '../components/BottomNav';
 import type { VoteCategory } from '../hooks/useVote'; // นำเข้า type ถ้ามี
 import { logAdminAdjustPoints, logAttendanceCheck } from '../utils/activityLogger';
+import ActivityLogsViewer from '../components/ActivityLogsViewer';
 
 // ✅ 1. เพิ่ม sheetId และ imageFile ใน Interface
 interface CandidateForm {
@@ -54,7 +55,7 @@ export default function Admin() {
     // User Management (for Admin and SuperAdmin)
     const [users, setUsers] = useState<UserData[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
-    const [activeTab, setActiveTab] = useState<'vote' | 'users' | 'categories'>('vote');
+    const [activeTab, setActiveTab] = useState<'vote' | 'users' | 'categories' | 'logs'>('vote');
     const [searchQuery, setSearchQuery] = useState('');
     const [editingUserId, setEditingUserId] = useState<string | null>(null);
     const [editPoints, setEditPoints] = useState<number>(0);
@@ -564,6 +565,16 @@ export default function Admin() {
                         >
                             📋 จัดการหมวดหมู่
                         </button>
+                        <button
+                            onClick={() => setActiveTab('logs')}
+                            className={`flex-1 py-4 rounded-xl font-bold transition-all ${
+                                activeTab === 'logs'
+                                    ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg'
+                                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                            }`}
+                        >
+                            📊 Activity Logs
+                        </button>
                     </div>
                 )}
 
@@ -989,6 +1000,21 @@ export default function Admin() {
                             })}
                         </div>
                     </>
+                )}
+
+                {/* Activity Logs Panel */}
+                {activeTab === 'logs' && (
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-2xl p-6 shadow-xl">
+                            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                                📊 Activity Logs
+                            </h2>
+                            <p className="text-gray-600 mb-6">
+                                ดูกิจกรรมทั้งหมดที่เกิดขึ้นในระบบ - การเช็คชื่อ, การแก้ไข Point, การแก้ไข Role, และอื่นๆ
+                            </p>
+                            <ActivityLogsViewer />
+                        </div>
+                    </div>
                 )}
             </div>
 

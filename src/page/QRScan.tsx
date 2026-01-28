@@ -37,6 +37,7 @@ export default function QRScan() {
     const [scannedUser, setScannedUser] = useState<ScannedUser | null>(null);
     const [scannedTicket, setScannedTicket] = useState<ScannedTicket | null>(null);
     const [pointsToAdd, setPointsToAdd] = useState<number>(0);
+    const [pointsReason, setPointsReason] = useState<string>(''); // เพิ่ม: เหตุผลในการเพิ่มแต้ม
     const [error, setError] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isScanning, setIsScanning] = useState<boolean>(true);
@@ -166,6 +167,11 @@ export default function QRScan() {
             return;
         }
         
+        if (!pointsReason.trim()) {
+            setError("กรุณากรอกเหตุผลในการเพิ่มแต้ม");
+            return;
+        }
+        
         setIsLoading(true);
         setError('');
         
@@ -180,7 +186,7 @@ export default function QRScan() {
             // เพิ่มแต้ม
             await addPointsToUser(scannedUser.uid, pointsToAdd);
             
-            // บันทึก activity log
+            // บันทึก activity log พร้อมเหตุผล
             await logAdminAdjustPoints(
                 scannedUser.uid,
                 scannedUser.email,
@@ -189,7 +195,7 @@ export default function QRScan() {
                 pointsAfter,
                 currentUser?.uid || '',
                 currentUser?.email || '',
-                'เพิ่มแต้มผ่าน QR Scan'
+                pointsReason // ส่งเหตุผลเข้าไป
             );
             
             setLastTransaction({
@@ -198,6 +204,8 @@ export default function QRScan() {
                 isDeduction: false,
             });
             setScannedUser(null);
+            setPointsReason(''); // Clear reason
+            setPointsToAdd(0);
         } catch (err) {
             setError("ไม่สามารถเพิ่มแต้มได้ กรุณาตรวจสอบสิทธิ์");
         } finally {
@@ -399,6 +407,24 @@ export default function QRScan() {
                                 />
                             </div>
                             
+                            {/* เพิ่ม: ช่องกรอกเหตุผล */}
+                            <div>
+                                <label className="text-gray-700 text-sm font-bold mb-2 block">
+                                    เหตุผลในการเพิ่มแต้ม <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={pointsReason}
+                                    onChange={(e) => setPointsReason(e.target.value)}
+                                    placeholder="เช่น ซื้อของ, เล่นเกม, เข้าร่วมกิจกรรม..."
+                                    className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                    maxLength={100}
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    จะถูกบันทึกใน Activity Log
+                                </p>
+                            </div>
+                            
                             {/* Quick Add Buttons */}
                             <div className="flex gap-2">
                                 {[10, 20, 50, 100].map((val) => (
@@ -418,7 +444,7 @@ export default function QRScan() {
 
                             <button 
                                 onClick={handleAddPoints} 
-                                disabled={isLoading || pointsToAdd <= 0}
+                                disabled={isLoading || pointsToAdd <= 0 || !pointsReason.trim()}
                                 className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded-2xl py-4 font-bold shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed"
                             >
                                 {isLoading ? (
