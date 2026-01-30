@@ -119,18 +119,19 @@ export default function VoteResults() {
                 
                 if (oldIndex !== -1 && newIndex < oldIndex) {
                     // แซงหน้า! (ขึ้นอันดับ)
-                    console.log(`🔥 OVERTAKE! ${candidateId} moved from #${oldIndex + 1} to #${newIndex + 1}`);
+                    const positionsGained = oldIndex - newIndex;
+                    console.log(`🔥 OVERTAKE! ${candidateId} moved from #${oldIndex + 1} to #${newIndex + 1} (+${positionsGained} positions!)`);
                     
                     // Flash effect
                     setOvertakeFlash(prev => ({ ...prev, [candidateId]: true }));
                     setTimeout(() => {
                         setOvertakeFlash(prev => ({ ...prev, [candidateId]: false }));
-                    }, 1500);
+                    }, 2000); // เพิ่มเวลาให้เห็นชัดขึ้น
                     
                     // Celebration ถ้าขึ้นอันดับ 1
                     if (newIndex === 0) {
                         setCelebrationId(candidateId);
-                        setTimeout(() => setCelebrationId(null), 3000);
+                        setTimeout(() => setCelebrationId(null), 4000); // เพิ่มเวลา celebration
                     }
                 }
             });
@@ -607,18 +608,30 @@ export default function VoteResults() {
                                 <motion.div
                                     key={candidate.id}
                                     layoutId={candidate.id}
-                                    initial={{ opacity: 0, y: 20 }}
+                                    initial={{ opacity: 0, y: 50 }}
                                     animate={{ 
                                         opacity: 1, 
                                         y: 0,
                                         scale: isOvertaking ? [1, 1.05, 1] : 1
                                     }}
-                                    exit={{ opacity: 0, scale: 0.8 }}
+                                    exit={{ opacity: 0, y: -50, scale: 0.9 }}
                                     transition={{ 
                                         type: "spring", 
-                                        stiffness: 300, 
-                                        damping: 30,
-                                        layout: { duration: 0.5 }
+                                        stiffness: 200, 
+                                        damping: 25,
+                                        mass: 0.8,
+                                        delay: index * 0.05, // Stagger effect
+                                        layout: { 
+                                            type: "spring",
+                                            stiffness: 150,
+                                            damping: 20,
+                                            duration: 0.8,
+                                            delay: index * 0.03 // Stagger delay สำหรับ layout
+                                        }
+                                    }}
+                                    style={{
+                                        position: 'relative',
+                                        zIndex: isOvertaking ? 50 : index === 0 ? 10 : 1
                                     }}
                                     className={`relative bg-white/95 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl transition-all duration-300 hover:scale-102 ${
                                         isWinner ? 'ring-4 ring-amber-400' : ''
@@ -626,12 +639,36 @@ export default function VoteResults() {
                                 >
                                     {/* ⚡ Overtake Flash Effect */}
                                     {isOvertaking && (
-                                        <motion.div
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: [0, 0.5, 0] }}
-                                            transition={{ duration: 1.5 }}
-                                            className="absolute inset-0 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 pointer-events-none z-10"
-                                        />
+                                        <>
+                                            <motion.div
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: [0, 0.6, 0] }}
+                                                transition={{ duration: 2, ease: "easeInOut" }}
+                                                className="absolute inset-0 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 pointer-events-none z-10"
+                                            />
+                                            
+                                            {/* ⬆️ Moving Up Indicator */}
+                                            <motion.div
+                                                initial={{ y: 50, opacity: 0 }}
+                                                animate={{ y: -30, opacity: [0, 1, 0] }}
+                                                transition={{ duration: 1.5, ease: "easeOut" }}
+                                                className="absolute left-2 top-1/2 -translate-y-1/2 z-30 pointer-events-none"
+                                            >
+                                                <div className="bg-green-500 text-white px-3 py-2 rounded-full shadow-2xl flex items-center gap-2">
+                                                    <span className="text-2xl animate-bounce">⬆️</span>
+                                                    <span className="font-bold">ขึ้นอันดับ!</span>
+                                                </div>
+                                            </motion.div>
+                                            
+                                            {/* ✨ Trail Effect */}
+                                            <motion.div
+                                                initial={{ scaleY: 0, opacity: 0 }}
+                                                animate={{ scaleY: 1, opacity: [0, 0.3, 0] }}
+                                                transition={{ duration: 1, ease: "easeOut" }}
+                                                className="absolute left-0 right-0 top-0 bottom-0 bg-gradient-to-b from-yellow-300/30 via-amber-400/20 to-transparent pointer-events-none z-5"
+                                                style={{ transformOrigin: 'bottom' }}
+                                            />
+                                        </>
                                     )}
                                     
                                     {/* 🎊 Celebration Effect */}
