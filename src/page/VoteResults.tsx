@@ -5,6 +5,7 @@ import BottomNav from "../components/BottomNav";
 import AnimatedNumber from '../components/AnimatedNumber';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebaseApp';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const CATEGORIES = [
     { id: 'band', name: 'Band', emoji: '🎸', description: 'วงดนตรี' },
@@ -22,6 +23,11 @@ export default function VoteResults() {
     // ✅ โหลด Podium Display Mode จาก settings/podium
     const [scoreDisplayMode, setScoreDisplayMode] = useState<'app30' | 'purchase70' | 'total100'>('total100');
     const [announcementVisible, setAnnouncementVisible] = useState(true);
+    
+    // ✅ Overtake Animation States
+    const [previousRankings, setPreviousRankings] = useState<string[]>([]);
+    const [overtakeFlash, setOvertakeFlash] = useState<{ [key: string]: boolean }>({});
+    const [celebrationId, setCelebrationId] = useState<string | null>(null);
 
     useEffect(() => {
         // โหลด Podium Settings
@@ -101,6 +107,37 @@ export default function VoteResults() {
             return scores.totalScore;
         })()
         : 1;
+
+    // ✅ ตรวจจับการแซงหน้า (Overtake Detection)
+    useEffect(() => {
+        const currentRankings = sortedCandidates.map(c => c.id);
+        
+        if (previousRankings.length > 0 && currentRankings.length > 0) {
+            // ตรวจสอบการเปลี่ยนอันดับ
+            currentRankings.forEach((candidateId, newIndex) => {
+                const oldIndex = previousRankings.indexOf(candidateId);
+                
+                if (oldIndex !== -1 && newIndex < oldIndex) {
+                    // แซงหน้า! (ขึ้นอันดับ)
+                    console.log(`🔥 OVERTAKE! ${candidateId} moved from #${oldIndex + 1} to #${newIndex + 1}`);
+                    
+                    // Flash effect
+                    setOvertakeFlash(prev => ({ ...prev, [candidateId]: true }));
+                    setTimeout(() => {
+                        setOvertakeFlash(prev => ({ ...prev, [candidateId]: false }));
+                    }, 1500);
+                    
+                    // Celebration ถ้าขึ้นอันดับ 1
+                    if (newIndex === 0) {
+                        setCelebrationId(candidateId);
+                        setTimeout(() => setCelebrationId(null), 3000);
+                    }
+                }
+            });
+        }
+        
+        setPreviousRankings(currentRankings);
+    }, [sortedCandidates.map(c => c.id).join(',')]);
 
     if (settingsLoading || candidatesLoading) {
         return (
@@ -541,56 +578,150 @@ export default function VoteResults() {
                             </div>
                         </div>
                     </div>
-                )}                {/* Results List */}
+                )}                {/* Results List with Overtake Animation */}
                 <div className="space-y-4 animate-fade-in">
-                    {sortedCandidates.map((candidate, index) => {
-                        const percentage = totalVotes > 0 ? (candidate.voteCount / totalVotes * 100) : 0;
-                        const barWidth = candidate.voteCount > 0 ? (candidate.voteCount / maxVotes * 100) : 0;
-                        const isWinner = index === 0 && !isOpen;
+                    <AnimatePresence mode="popLayout">
+                        {sortedCandidates.map((candidate, index) => {
+                            const scores = calculateScores(candidate);
+                            const currentScore = scoreDisplayMode === 'app30' ? scores.score30 : 
+                                               scoreDisplayMode === 'purchase70' ? scores.score70 : 
+                                               scores.totalScore;
+                            const percentage = maxVotes > 0 ? (currentScore / maxVotes * 100) : 0;
+                            const barWidth = currentScore > 0 ? (currentScore / maxVotes * 100) : 0;
+                            const isWinner = index === 0 && !isOpen;
+                            const isOvertaking = overtakeFlash[candidate.id];
+                            const isCelebrating = celebrationId === candidate.id;
+                            
+                            // ✅ Close Race Detection (ห่างกันน้อยกว่า 5%)
+                            const isCloseRace = index < sortedCandidates.length - 1 && (() => {
+                                const nextScores = calculateScores(sortedCandidates[index + 1]);
+                                const nextScore = scoreDisplayMode === 'app30' ? nextScores.score30 : 
+                                                scoreDisplayMode === 'purchase70' ? nextScores.score70 : 
+                                                nextScores.totalScore;
+                                const diff = currentScore - nextScore;
+                                const diffPercent = (diff / currentScore) * 100;
+                                return diffPercent < 5 && diffPercent > 0;
+                            })();
 
-                        return (
-                            <div 
-                                key={candidate.id}
-                                className={`bg-white/95 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl transition-all duration-300 hover:scale-102 ${
-                                    isWinner ? 'ring-4 ring-amber-400' : ''
-                                }`}
-                            >
-                                <div className="p-6">
-                                    <div className="flex items-center gap-4 mb-4">
-                                        {/* Rank Badge */}
-                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl flex-shrink-0 ${
-                                            index === 0 ? 'bg-gradient-to-br from-amber-400 to-yellow-500 text-white shadow-lg' :
-                                            index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-gray-700' :
-                                            index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700 text-white' :
-                                            'bg-gray-200 text-gray-600'
-                                        }`}>
-                                            {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                            return (
+                                <motion.div
+                                    key={candidate.id}
+                                    layoutId={candidate.id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ 
+                                        opacity: 1, 
+                                        y: 0,
+                                        scale: isOvertaking ? [1, 1.05, 1] : 1
+                                    }}
+                                    exit={{ opacity: 0, scale: 0.8 }}
+                                    transition={{ 
+                                        type: "spring", 
+                                        stiffness: 300, 
+                                        damping: 30,
+                                        layout: { duration: 0.5 }
+                                    }}
+                                    className={`relative bg-white/95 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl transition-all duration-300 hover:scale-102 ${
+                                        isWinner ? 'ring-4 ring-amber-400' : ''
+                                    } ${isOvertaking ? 'ring-4 ring-red-500 shadow-2xl shadow-red-500/50' : ''}`}
+                                >
+                                    {/* ⚡ Overtake Flash Effect */}
+                                    {isOvertaking && (
+                                        <motion.div
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: [0, 0.5, 0] }}
+                                            transition={{ duration: 1.5 }}
+                                            className="absolute inset-0 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 pointer-events-none z-10"
+                                        />
+                                    )}
+                                    
+                                    {/* 🎊 Celebration Effect */}
+                                    {isCelebrating && (
+                                        <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden">
+                                            {[...Array(20)].map((_, i) => (
+                                                <motion.div
+                                                    key={i}
+                                                    initial={{ 
+                                                        opacity: 1, 
+                                                        y: '100%', 
+                                                        x: `${Math.random() * 100}%`,
+                                                        scale: 0
+                                                    }}
+                                                    animate={{ 
+                                                        opacity: [1, 1, 0], 
+                                                        y: '-20%',
+                                                        scale: [0, 1.5, 0],
+                                                        rotate: Math.random() * 360
+                                                    }}
+                                                    transition={{ 
+                                                        duration: 2,
+                                                        delay: i * 0.1,
+                                                        ease: "easeOut"
+                                                    }}
+                                                    className="absolute text-2xl"
+                                                >
+                                                    {['🎉', '⭐', '✨', '🎊', '💫'][i % 5]}
+                                                </motion.div>
+                                            ))}
                                         </div>
+                                    )}
+                                    
+                                    {/* 🔥 Close Race Indicator */}
+                                    {isCloseRace && (
+                                        <motion.div
+                                            animate={{ scale: [1, 1.1, 1] }}
+                                            transition={{ duration: 1, repeat: Infinity }}
+                                            className="absolute top-2 right-2 z-10"
+                                        >
+                                            <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
+                                                <span className="animate-pulse">🔥</span>
+                                                <span>แข่งดุเดือด!</span>
+                                            </div>
+                                        </motion.div>
+                                    )}
 
-                                        {/* Avatar */}
-                                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-red-200 to-amber-200 flex-shrink-0 shadow-lg">
-                                            {candidate.imageUrl ? (
-                                                <img 
-                                                    src={candidate.imageUrl} 
-                                                    alt={candidate.name}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-3xl">
-                                                    {candidate.category === 'band' && '�'}
-                                                    {candidate.category === 'solo' && '�'}
-                                                    {candidate.category === 'cover' && '�'}
-                                                </div>
-                                            )}
-                                        </div>
+                                    <div className="p-6 relative z-0">
+                                        <div className="flex items-center gap-4 mb-4">
+                                            {/* Rank Badge */}
+                                            <motion.div
+                                                animate={isOvertaking ? { 
+                                                    rotate: [0, -10, 10, -10, 10, 0],
+                                                    scale: [1, 1.2, 1]
+                                                } : {}}
+                                                transition={{ duration: 0.5 }}
+                                                className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl flex-shrink-0 ${
+                                                    index === 0 ? 'bg-gradient-to-br from-amber-400 to-yellow-500 text-white shadow-lg' :
+                                                    index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-gray-700' :
+                                                    index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700 text-white' :
+                                                    'bg-gray-200 text-gray-600'
+                                                }`}
+                                            >
+                                                {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                                            </motion.div>
 
-                                        {/* Info */}
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="font-bold text-lg text-gray-800 truncate">{candidate.name}</h3>
-                                            <p className="text-sm text-gray-600 truncate">{candidate.description}</p>
-                                        </div>
+                                            {/* Avatar */}
+                                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-red-200 to-amber-200 flex-shrink-0 shadow-lg">
+                                                {candidate.imageUrl ? (
+                                                    <img 
+                                                        src={candidate.imageUrl} 
+                                                        alt={candidate.name}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-3xl">
+                                                        {candidate.category === 'band' && '🎸'}
+                                                        {candidate.category === 'solo' && '🎤'}
+                                                        {candidate.category === 'cover' && '💃'}
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                        {/* Votes */}
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-bold text-lg text-gray-800 truncate">{candidate.name}</h3>
+                                                <p className="text-sm text-gray-600 truncate">{candidate.description}</p>
+                                            </div>
+
+                                            {/* Votes */}
                                         <div className="text-right">
                                             <div className="text-3xl font-bold text-red-600">
                                                 <AnimatedNumber value={(() => {
@@ -604,22 +735,34 @@ export default function VoteResults() {
                                         </div>
                                     </div>
 
-                                    {/* Progress Bar */}
+                                    {/* Progress Bar with Animation */}
                                     <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
-                                        <div 
-                                            className={`absolute top-0 left-0 h-full transition-all duration-1000 ease-out ${
+                                        <motion.div
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${barWidth}%` }}
+                                            transition={{ duration: 1, ease: "easeOut" }}
+                                            className={`absolute top-0 left-0 h-full ${
                                                 index === 0 ? 'bg-gradient-to-r from-amber-400 to-yellow-500' :
                                                 index === 1 ? 'bg-gradient-to-r from-gray-400 to-gray-500' :
                                                 index === 2 ? 'bg-gradient-to-r from-amber-600 to-amber-700' :
                                                 'bg-gradient-to-r from-red-500 to-red-600'
                                             }`}
-                                            style={{ width: `${barWidth}%` }}
                                         />
+                                        
+                                        {/* Pulse effect สำหรับ Close Race */}
+                                        {isCloseRace && (
+                                            <motion.div
+                                                animate={{ opacity: [0.5, 0.8, 0.5] }}
+                                                transition={{ duration: 1.5, repeat: Infinity }}
+                                                className="absolute top-0 right-0 h-full w-2 bg-red-500"
+                                            />
+                                        )}
                                     </div>
                                 </div>
-                            </div>
+                            </motion.div>
                         );
                     })}
+                    </AnimatePresence>
 
                     {sortedCandidates.length === 0 && (
                         <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-12 text-center shadow-xl">
