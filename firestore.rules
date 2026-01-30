@@ -61,6 +61,7 @@ service cloud.firestore {
       // แก้ไขได้:
       // - ตัวเอง (อนุญาตให้แก้ voteRights, voteHistory, points, updatedAt สำหรับโหวตและซื้อสิทธิ์)
       // - Register (แก้ได้เฉพาะ attendance สำหรับเช็คเข้างาน)
+      // - Staff (แก้ได้เฉพาะ points, updatedAt สำหรับเพิ่มแต้ม)
       // - Admin ขึ้นไป (admin, superadmin) แก้ได้ทุกอย่าง
       allow update: if isAuthenticated() && (
         (isOwner(userId) && (
@@ -68,7 +69,11 @@ service cloud.firestore {
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'tickets'])
         ))
         || (isRegister() && 
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendance']))
+         // ✅ Register แก้ได้เฉพาะ attendance และ updatedAt (สำหรับเช็คเข้างาน)
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendance', 'updatedAt']))
+        || (isStaff() && 
+         // ✅ Staff แก้ได้เฉพาะ points และ updatedAt (สำหรับเพิ่มแต้มให้ User)
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['points', 'updatedAt']))
         || isAdmin()
       );
       
@@ -120,10 +125,11 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       
       // อัพเดทได้: ทุกคนที่ login (สำหรับเพิ่ม voteCount เวลาโหวต)
+      // หรือ Admin สามารถแก้ isVisible, isActive ได้
       allow update: if isAuthenticated() && (
         // ✅ ถ้าแก้เฉพาะ voteCount และ updatedAt อนุญาตให้ทุกคนแก้ได้
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['voteCount', 'updatedAt'])
-        || isAdmin() // Admin แก้ได้ทุกอย่าง
+        || isAdmin() // Admin แก้ได้ทุกอย่าง (รวม isVisible, isActive)
       );
       
       // สร้าง/ลบ: เฉพาะ Admin ขึ้นไป
@@ -179,6 +185,33 @@ service cloud.firestore {
       
       // สร้าง/แก้ไข/ลบ: เฉพาะ Admin ขึ้นไป
       allow create, update, delete: if isAdmin();
+    }
+
+    // ===================================
+    // Tickets Collection (ตั๋วรางวัลจากการหมุนวงล้อ)
+    // ===================================
+    match /tickets/{ticketId} {
+      // อ่านได้: 
+      // - ตัวเอง (เจ้าของตั๋ว)
+      // - Staff ขึ้นไป (สำหรับเคลมรางวัล)
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid 
+        || isStaff()
+      );
+      
+      // สร้างได้: ทุกคนที่ login (เมื่อหมุนวงล้อได้รางวัล)
+      allow create: if isAuthenticated() 
+        && request.resource.data.userId == request.auth.uid;
+      
+      // แก้ไขได้:
+      // - Staff ขึ้นไป (สำหรับเคลมรางวัล - แก้ claimed, claimedAt, claimedBy)
+      allow update: if isStaff() && (
+        // ✅ อนุญาตให้แก้เฉพาะ claimed, claimedAt, claimedBy
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimed', 'claimedAt', 'claimedBy'])
+      );
+      
+      // ลบได้: เฉพาะ Admin ขึ้นไป
+      allow delete: if isAdmin();
     }
 
     // ===================================
@@ -254,6 +287,39 @@ service cloud.firestore {
       
       // แก้ไข/ลบ: เฉพาะ SuperAdmin
       allow update, delete: if isSuperAdmin();
+    }
+
+    // ===================================
+    // WarpStatus Collection (สถานะระบบส่งวาป IG)
+    // ===================================
+    match /warpStatus/{statusId} {
+      // อ่านได้: ทุกคนที่ login แล้ว (เพื่อเช็คว่าระบบเปิดหรือปิด)
+      allow read: if isAuthenticated();
+      
+      // แก้ไข: เฉพาะ Admin ขึ้นไป (เปิด/ปิดระบบ, รีเซ็ตจำนวน)
+      allow create, update: if isAdmin();
+      
+      // ลบ: เฉพาะ SuperAdmin
+      allow delete: if isSuperAdmin();
+    }
+
+    // ===================================
+    // Notifications Collection (การแจ้งเตือนสำหรับผู้ใช้)
+    // ===================================
+    match /notifications/{notificationId} {
+      // อ่านได้: ทุกคนที่ login แล้ว
+      allow read: if isAuthenticated();
+      
+      // สร้าง/แก้ไข/ลบ: เฉพาะผ่าน Admin Script (ไม่อนุญาตผ่าน Frontend)
+      allow create, update, delete: if false;
+    }
+
+    // ===================================
+    // Users SeenNotifications Subcollection
+    // ===================================
+    match /users/{userId}/seenNotifications/{notificationId} {
+      // อ่าน/เขียนได้: เฉพาะเจ้าของ
+      allow read, write: if isAuthenticated() && isOwner(userId);
     }
 
     // ===================================

@@ -18,11 +18,27 @@ const QrScanner = ({ onScanSuccess, onScanFailure }: QrScannerProps) => {
       .then((devices) => {
         if (devices && devices.length) {
           setCameras(devices);
-          // เริ่มด้วยกล้องหลัง (environment) ถ้ามี
-          const backCameraIndex = devices.findIndex(
-            (d) => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('rear')
+          
+          // 🎯 บังคับใช้กล้องหลัง (environment) เป็นค่าเริ่มต้น
+          // ลองหาจาก label ก่อน
+          let backCameraIndex = devices.findIndex(
+            (d) => d.label.toLowerCase().includes('back') || 
+                   d.label.toLowerCase().includes('rear') ||
+                   d.label.toLowerCase().includes('environment')
           );
-          setCurrentCameraIndex(backCameraIndex >= 0 ? backCameraIndex : 0);
+          
+          // ถ้าไม่เจอ ให้ใช้กล้องตัวสุดท้าย (มักจะเป็นกล้องหลัง)
+          if (backCameraIndex < 0 && devices.length > 1) {
+            backCameraIndex = devices.length - 1;
+          }
+          
+          // ถ้ายังไม่เจอ ใช้กล้องแรก
+          if (backCameraIndex < 0) {
+            backCameraIndex = 0;
+          }
+          
+          console.log('📷 Selected camera:', devices[backCameraIndex].label);
+          setCurrentCameraIndex(backCameraIndex);
         }
       })
       .catch((err) => {
@@ -40,24 +56,48 @@ const QrScanner = ({ onScanSuccess, onScanFailure }: QrScannerProps) => {
     const startScanning = async () => {
       try {
         setIsScanning(true);
-        await scanner.start(
-          cameras[currentCameraIndex].id,
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
-          },
-          (decodedText) => {
-            onScanSuccess(decodedText);
-            scanner.stop().catch(console.error);
-            setIsScanning(false);
-          },
-          (errorMessage) => {
-            if (onScanFailure && !errorMessage.includes('NotFoundException')) {
-              onScanFailure(errorMessage);
+        
+        // 🔍 ใช้ facingMode แทน cameraId เพื่อบังคับใช้กล้องหลัง
+        const config = {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        };
+        
+        // พยายามใช้ facingMode: environment (กล้องหลัง) ก่อน
+        try {
+          await scanner.start(
+            { facingMode: 'environment' }, // 🎯 บังคับกล้องหลัง
+            config,
+            (decodedText) => {
+              onScanSuccess(decodedText);
+              scanner.stop().catch(console.error);
+              setIsScanning(false);
+            },
+            (errorMessage) => {
+              if (onScanFailure && !errorMessage.includes('NotFoundException')) {
+                onScanFailure(errorMessage);
+              }
             }
-          }
-        );
+          );
+        } catch (facingModeError) {
+          // ถ้า facingMode ไม่ได้ผล ใช้ camera ID แทน
+          console.log('Fallback to camera ID:', cameras[currentCameraIndex].label);
+          await scanner.start(
+            cameras[currentCameraIndex].id,
+            config,
+            (decodedText) => {
+              onScanSuccess(decodedText);
+              scanner.stop().catch(console.error);
+              setIsScanning(false);
+            },
+            (errorMessage) => {
+              if (onScanFailure && !errorMessage.includes('NotFoundException')) {
+                onScanFailure(errorMessage);
+              }
+            }
+          );
+        }
       } catch (err) {
         console.error('Error starting scanner:', err);
         setIsScanning(false);
@@ -99,7 +139,7 @@ const QrScanner = ({ onScanSuccess, onScanFailure }: QrScannerProps) => {
             className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all active:scale-95"
           >
             <i className="ri-camera-switch-line text-xl"></i>
-            <span>สลับกล้อง ({currentCameraIndex === 0 ? 'หน้า' : 'หลัง'})</span>
+            <span>สลับกล้อง</span>
           </button>
         </div>
       )}

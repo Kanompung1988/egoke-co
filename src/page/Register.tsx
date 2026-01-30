@@ -33,7 +33,7 @@ export default function Register() {
     // Check if user has permission (Register, Admin, or SuperAdmin only)
     useEffect(() => {
         if (currentUser && !['register', 'admin', 'superadmin'].includes(currentUser.role || '')) {
-            alert('คุณไม่มีสิทธิ์เข้าถึงหน้านี้');
+            alert('คุณไม่มีสิทธิ์เข้าถึงหน้านี้ - ต้องเป็น Register, Admin หรือ SuperAdmin');
             navigate('/');
         }
     }, [currentUser, navigate]);
@@ -117,26 +117,25 @@ export default function Register() {
         <div className="min-h-screen bg-gray-100 pb-24">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 shadow-lg">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-                            📋 ระบบเช็คเข้างาน
-                        </h1>
-                        <p className="text-blue-100">บันทึกการเข้าร่วมงาน EGOKE</p>
-                    </div>
-                    <button
-                        onClick={() => navigate('/')}
-                        className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-bold transition-colors"
-                    >
-                        ← กลับหน้าหลัก
-                    </button>
+                <div className="max-w-7xl mx-auto">
+                    <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
+                        📋 ระบบเช็คเข้างาน
+                    </h1>
+                    <p className="text-blue-100">
+                        {isRegister && '🔖 Register: เช็คชื่อผู้เข้าร่วมงาน'}
+                        {isAdmin && '👑 Admin: จัดการการเข้างานทั้งหมด'}
+                    </p>
+                    <p className="text-blue-200 text-sm mt-1">{currentUser.email}</p>
                 </div>
             </div>
 
             <div className="max-w-7xl mx-auto p-6">
                 <div className="bg-white rounded-2xl p-6 shadow-xl">
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-2xl font-bold text-gray-800">📅 เช็คการเข้างาน</h2>
+                        <h2 className="text-2xl font-bold text-gray-800">
+                            📅 เช็คการเข้างาน
+                            {isRegister && <span className="ml-3 text-sm font-normal text-blue-600">(เช็คชื่อได้อย่างเดียว)</span>}
+                        </h2>
                         <button
                             onClick={() => window.location.reload()}
                             className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-bold transition-colors"
@@ -169,6 +168,26 @@ export default function Register() {
                             แสดง {filteredUsers.length} จาก {users.length} ผู้ใช้
                         </p>
                     </div>
+
+                    {/* Notice สำหรับ Register */}
+                    {isRegister && (
+                        <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-xl">
+                            <div className="flex items-start gap-3">
+                                <span className="text-2xl">ℹ️</span>
+                                <div className="text-sm text-blue-800">
+                                    <p className="font-bold mb-2">สิทธิ์ของคุณ (Register):</p>
+                                    <ul className="list-disc ml-4 space-y-1">
+                                        <li>✅ <strong>เช็คชื่อได้</strong> - ติ๊ก D1, D2, D3</li>
+                                        <li>❌ <strong>เพิ่มแต้มไม่ได้</strong> - ติดต่อ Staff/Admin</li>
+                                        <li>❌ <strong>ปรับ Role ไม่ได้</strong> - ติดต่อ Admin</li>
+                                        <li className="mt-2 pt-2 border-t border-blue-200 text-blue-600">
+                                            💡 ใช้หน้า <strong>"Scan QR"</strong> เพื่อเช็คชื่อแบบเร็ว!
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {loadingUsers ? (
                         <div className="text-center py-12">

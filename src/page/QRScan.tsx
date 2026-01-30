@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, query, where, getDocs, collection } from 'firebase/firestore';
 import { db, addPointsToUser } from '../firebaseApp';
 import { useAuth } from '../hooks/useAuth';
 import BottomNav from '../components/BottomNav';
@@ -119,44 +119,39 @@ export default function QRScan() {
 
     const handleTicketScan = async (ticketId: string) => {
         try {
-            // ค้นหา ticket จาก history subcollection ของทุกคน
-            const usersRef = collection(db, 'users');
-            const usersSnapshot = await getDocs(usersRef);
+            console.log('🔍 Searching for ticket:', ticketId);
             
-            let ticketFound = false;
+            // 🚀 OPTIMIZED: Use static import (no await import!)
+            const ticketsRef = collection(db, 'tickets');
+            const ticketQuery = query(ticketsRef, where('ticketId', '==', ticketId));
+            const ticketSnapshot = await getDocs(ticketQuery);
             
-            for (const userDoc of usersSnapshot.docs) {
-                const historyRef = collection(db, 'users', userDoc.id, 'history');
-                const historyQuery = query(historyRef, where('ticketId', '==', ticketId));
-                const historySnapshot = await getDocs(historyQuery);
+            if (!ticketSnapshot.empty) {
+                const ticketDoc = ticketSnapshot.docs[0];
+                const ticketData = ticketDoc.data();
                 
-                if (!historySnapshot.empty) {
-                    const ticketDoc = historySnapshot.docs[0];
-                    const ticketData = ticketDoc.data();
-                    const userData = userDoc.data();
-                    
-                    setScannedTicket({
-                        ticketId: ticketId,
-                        userId: userDoc.id,
-                        userName: userData.displayName || 'ไม่ระบุชื่อ',
-                        prize: ticketData.prize || 'ไม่ระบุรางวัล',
-                        emoji: ticketData.emoji || '🎁',
-                        claimed: ticketData.claimed || false,
-                        timestamp: ticketData.timestamp || Date.now()
-                    });
-                    
-                    ticketFound = true;
-                    break;
-                }
+                console.log('✅ Ticket found in tickets collection');
+                
+                setScannedTicket({
+                    ticketId: ticketData.ticketId,
+                    userId: ticketData.userId,
+                    userName: ticketData.userName || 'ไม่ระบุชื่อ',
+                    prize: ticketData.prize || 'ไม่ระบุรางวัล',
+                    emoji: ticketData.emoji || '🎁',
+                    claimed: ticketData.claimed || false,
+                    timestamp: ticketData.timestamp || Date.now()
+                });
+                return;
             }
             
-            if (!ticketFound) {
-                setError("❌ ไม่พบตั๋วรางวัลในระบบ");
-                setIsScanning(true);
-            }
-        } catch (err) {
-            console.error('Ticket scan error:', err);
-            setError("เกิดข้อผิดพลาดในการค้นหาตั๋ว");
+            // ⚠️ ไม่เจอในระบบ - อาจเป็นตั๋วปลอมหรือถูกลบแล้ว
+            console.error('❌ Ticket not found');
+            setError("❌ ไม่พบตั๋วรางวัลในระบบ กรุณาตรวจสอบ QR Code");
+            setIsScanning(true);
+            
+        } catch (err: any) {
+            console.error('❌ Ticket scan error:', err);
+            setError(`เกิดข้อผิดพลาด: ${err.message || 'ไม่สามารถค้นหาตั๋วได้'}`);
             setIsScanning(true);
         }
     };
@@ -228,51 +223,107 @@ export default function QRScan() {
         setError('');
         
         try {
-            let claimedUserId = '';
-            let claimedUserEmail = '';
-            let claimedUserName = '';
-            let userPoints = 0;
-
-            // อัพเดทสถานะว่า claimed แล้ว
-            const usersRef = collection(db, 'users');
-            const usersSnapshot = await getDocs(usersRef);
+            console.log('🎁 Claiming ticket:', scannedTicket.ticketId);
             
-            for (const userDoc of usersSnapshot.docs) {
-                const historyRef = collection(db, 'users', userDoc.id, 'history');
-                const historyQuery = query(historyRef, where('ticketId', '==', scannedTicket.ticketId));
-                const historySnapshot = await getDocs(historyQuery);
+            // ✅ อัพเดทสถานะใน tickets collection
+            const { collection: firestoreCollection } = await import('firebase/firestore');
+            const ticketsRef = firestoreCollection(db, 'tickets');
+            const ticketQuery = query(ticketsRef, where('ticketId', '==', scannedTicket.ticketId));
+            const ticketSnapshot = await getDocs(ticketQuery);
+            
+            let ticketUpdated = false;
+            
+            if (!ticketSnapshot.empty) {
+                // พบตั๋วใน tickets collection
+                const ticketDocRef = ticketSnapshot.docs[0].ref;
                 
-                if (!historySnapshot.empty) {
-                    const ticketDocRef = historySnapshot.docs[0].ref;
-                    await updateDoc(ticketDocRef, {
-                        claimed: true,
-                        claimedAt: Date.now(),
-                        claimedBy: currentUser?.uid
-                    });
-
-                    // Get user data for logging
-                    const userData = userDoc.data();
-                    claimedUserId = userDoc.id;
-                    claimedUserEmail = userData.email || '';
-                    claimedUserName = userData.displayName || scannedTicket.userName;
-                    userPoints = userData.points || 0;
-
-                    // Log prize claim activity with staff/admin info
-                    await logPrizeClaim(
-                        claimedUserId,
-                        claimedUserEmail,
-                        claimedUserName,
-                        scannedTicket.ticketId || '',
-                        scannedTicket.prize,
-                        userPoints, // pointsBefore
-                        userPoints, // pointsAfter (no change)
-                        currentUser?.uid,
-                        currentUser?.email || ''
-                    );
-                    
-                    break;
-                }
+                console.log('✅ Updating ticket in tickets collection');
+                
+                await updateDoc(ticketDocRef, {
+                    claimed: true,
+                    claimedAt: Date.now(),
+                    claimedBy: {
+                        uid: currentUser?.uid,
+                        email: currentUser?.email,
+                        name: currentUser?.displayName || currentUser?.email
+                    }
+                });
+                
+                ticketUpdated = true;
             }
+            
+            // ✅ อัพเดทสถานะใน user history (ถ้ามี)
+            const userId = scannedTicket.userId;
+            const historyRef = firestoreCollection(db, 'users', userId, 'history');
+            const historyQuery = query(historyRef, where('ticketId', '==', scannedTicket.ticketId));
+            const historySnapshot = await getDocs(historyQuery);
+            
+            if (!historySnapshot.empty) {
+                const historyDocRef = historySnapshot.docs[0].ref;
+                
+                console.log('✅ Updating ticket in user history');
+                
+                await updateDoc(historyDocRef, {
+                    claimed: true,
+                    claimedAt: Date.now(),
+                    claimedBy: {
+                        uid: currentUser?.uid,
+                        email: currentUser?.email,
+                        name: currentUser?.displayName || currentUser?.email
+                    }
+                });
+                
+                ticketUpdated = true;
+            }
+            
+            if (!ticketUpdated) {
+                console.error('❌ Ticket not found for update');
+                setError("❌ ไม่พบตั๋วในระบบ");
+                setIsLoading(false);
+                return;
+            }
+
+            // ✅ Get user data
+            const userDoc = await getDoc(doc(db, 'users', userId));
+            const userData = userDoc.data();
+            const claimedUserId = userId;
+            const claimedUserEmail = userData?.email || '';
+            const claimedUserName = userData?.displayName || scannedTicket.userName;
+            const userPoints = userData?.points || 0;
+
+            // ✅ เพิ่มสิทธิ์โหวตถ้ารางวัลเป็น "ตั๋วโหวตฟรี"
+            if (scannedTicket.prize === 'ตั๋วโหวตฟรี') {
+                const userDocRef = doc(db, 'users', userId);
+                const currentVoteRights = userData?.voteRights || { band: 1, solo: 1, cover: 1 };
+                
+                console.log('🎟️ Adding vote rights...');
+                
+                // เพิ่มสิทธิ์โหวตทุกหมวดอย่างละ 1
+                await updateDoc(userDocRef, {
+                    voteRights: {
+                        band: (currentVoteRights.band || 0) + 1,
+                        solo: (currentVoteRights.solo || 0) + 1,
+                        cover: (currentVoteRights.cover || 0) + 1
+                    }
+                });
+                
+                console.log('✅ Vote rights added');
+            }
+
+            // ✅ Log prize claim activity
+            await logPrizeClaim(
+                claimedUserId,
+                claimedUserEmail,
+                claimedUserName,
+                scannedTicket.ticketId || '',
+                scannedTicket.prize,
+                userPoints,
+                userPoints,
+                currentUser?.uid,
+                currentUser?.email || ''
+            );
+            
+            console.log('✅ Prize claimed successfully');
             
             setLastTransaction({
                 userName: scannedTicket.userName,
@@ -281,9 +332,10 @@ export default function QRScan() {
                 prizeName: scannedTicket.prize
             });
             setScannedTicket(null);
-        } catch (err) {
-            console.error('Claim error:', err);
-            setError("ไม่สามารถเคลมรางวัลได้");
+            
+        } catch (err: any) {
+            console.error('❌ Claim error:', err);
+            setError(`ไม่สามารถเคลมรางวัลได้: ${err.message || 'เกิดข้อผิดพลาด'}`);
         } finally {
             setIsLoading(false);
         }
@@ -386,9 +438,23 @@ export default function QRScan() {
                             }
                         </p>
                         {lastTransaction.isDeduction ? (
-                            <div className="bg-purple-100 text-purple-700 border-purple-300 font-bold text-xl rounded-2xl px-6 py-4 border-2 mb-6">
-                                🎁 {lastTransaction.prizeName}
-                            </div>
+                            <>
+                                <div className="bg-purple-100 text-purple-700 border-purple-300 font-bold text-xl rounded-2xl px-6 py-4 border-2 mb-4">
+                                    🎁 {lastTransaction.prizeName}
+                                </div>
+                                {/* แสดงข้อความพิเศษสำหรับตั๋วโหวตฟรี */}
+                                {lastTransaction.prizeName === 'ตั๋วโหวตฟรี' && (
+                                    <div className="bg-blue-100 text-blue-700 border-blue-300 rounded-xl px-4 py-3 border-2 mb-4">
+                                        <div className="font-bold text-lg mb-1">✨ โบนัส!</div>
+                                        <div className="text-sm">
+                                            ได้รับสิทธิ์โหวตเพิ่ม <span className="font-bold">+1 ทุกหมวด</span>
+                                        </div>
+                                        <div className="text-xs mt-1 opacity-75">
+                                            (Band +1, Solo +1, Cover +1)
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         ) : (
                             <div className="bg-green-100 text-green-700 border-green-300 font-bold text-3xl rounded-2xl px-6 py-4 border-2 mb-6">
                                 + {lastTransaction.pointsAdded} แต้ม

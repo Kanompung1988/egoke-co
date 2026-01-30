@@ -10,6 +10,11 @@ const LOG_TYPE_COLORS = {
     PRIZE_CLAIM: 'bg-amber-100 text-amber-800 border-amber-300',
     GAME_SPIN: 'bg-pink-100 text-pink-800 border-pink-300',
     ADMIN_ADJUST: 'bg-orange-100 text-orange-800 border-orange-300',
+    CHECKIN: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+    grant_free_vote: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+    update_purchase_points: 'bg-violet-100 text-violet-800 border-violet-300',
+    change_podium_mode: 'bg-teal-100 text-teal-800 border-teal-300',
+    toggle_announcement: 'bg-rose-100 text-rose-800 border-rose-300',
 };
 
 const LOG_TYPE_EMOJI = {
@@ -20,6 +25,11 @@ const LOG_TYPE_EMOJI = {
     PRIZE_CLAIM: '🎁',
     GAME_SPIN: '🎰',
     ADMIN_ADJUST: '👨‍💼',
+    CHECKIN: '✅',
+    grant_free_vote: '🎉',
+    update_purchase_points: '📊',
+    change_podium_mode: '🏆',
+    toggle_announcement: '📢',
 };
 
 const LOG_TYPE_LABELS = {
@@ -30,6 +40,11 @@ const LOG_TYPE_LABELS = {
     PRIZE_CLAIM: 'แลกของรางวัล',
     GAME_SPIN: 'หมุนวงล้อ',
     ADMIN_ADJUST: 'ปรับแต้ม',
+    CHECKIN: 'เช็คอิน',
+    grant_free_vote: 'แจกสิทธิ์โหวต',
+    update_purchase_points: 'แก้ไขคะแนนซื้อ',
+    change_podium_mode: 'เปลี่ยนโหมดโพเดียม',
+    toggle_announcement: 'เปิด/ปิดประกาศ',
 };
 
 export default function ActivityLogsViewer() {
@@ -43,9 +58,12 @@ export default function ActivityLogsViewer() {
     const filteredLogs = useMemo(() => {
         return logs.filter(log => {
             const matchesSearch = 
-                log.userEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                log.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                log.description.toLowerCase().includes(searchQuery.toLowerCase());
+                log.userEmail?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                log.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                log.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                log.message?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                log.adminEmail?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                log.adminName?.toLowerCase().includes(searchQuery.toLowerCase());
 
             const matchesType = filterType === 'ALL' || log.type === filterType;
 
@@ -64,17 +82,17 @@ export default function ActivityLogsViewer() {
     const exportToCSV = () => {
         const headers = ['เวลา', 'ประเภท', 'อีเมล', 'ชื่อ', 'รายละเอียด', 'ดำเนินการโดย', 'แต้มก่อน', 'แต้มหลัง', 'เปลี่ยนแปลง'];
         const rows = filteredLogs.map(log => {
-            const actionBy = log.metadata?.adjustedByEmail || log.metadata?.claimedByEmail || log.metadata?.grantedByEmail || 'ผู้ใช้เอง';
+            const actionBy = log.metadata?.adjustedByEmail || log.metadata?.claimedByEmail || log.metadata?.grantedByEmail || log.adminEmail || 'ผู้ใช้เอง';
             return [
                 log.timestamp?.toDate?.()?.toLocaleString('th-TH') || '',
-                LOG_TYPE_LABELS[log.type],
-                log.userEmail,
-                log.userName,
-                log.description,
+                LOG_TYPE_LABELS[log.type] || log.type,
+                log.userEmail || log.adminEmail || '',
+                log.userName || log.adminName || '',
+                log.description || log.message || '',
                 actionBy,
-                log.pointsBefore,
-                log.pointsAfter,
-                log.pointsChange,
+                log.pointsBefore ?? '',
+                log.pointsAfter ?? '',
+                log.pointsChange ?? '',
             ];
         });
 
@@ -153,7 +171,7 @@ export default function ActivityLogsViewer() {
             </div>
             
             {/* Additional Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="bg-gradient-to-br from-pink-500 via-pink-600 to-rose-600 rounded-xl p-4 text-white shadow-lg">
                     <div className="text-xl mb-1">🎰</div>
                     <div className="text-2xl font-bold">{logs.filter(log => log.type === 'GAME_SPIN').length}</div>
@@ -164,6 +182,12 @@ export default function ActivityLogsViewer() {
                     <div className="text-xl mb-1">👨‍💼</div>
                     <div className="text-2xl font-bold">{logs.filter(log => log.type === 'ADMIN_ADJUST').length}</div>
                     <div className="text-xs opacity-90">ปรับแต้ม</div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-cyan-500 via-cyan-600 to-blue-600 rounded-xl p-4 text-white shadow-lg">
+                    <div className="text-xl mb-1">✅</div>
+                    <div className="text-2xl font-bold">{logs.filter(log => log.type === 'CHECKIN').length}</div>
+                    <div className="text-xs opacity-90">เช็คอิน</div>
                 </div>
                 
                 <div className="bg-gradient-to-br from-teal-500 via-teal-600 to-cyan-600 rounded-xl p-4 text-white shadow-lg">
@@ -286,10 +310,10 @@ export default function ActivityLogsViewer() {
                                             </div>
                                         </td>
                                         <td>
-                                            <div className="font-semibold text-sm">{log.userName}</div>
-                                            <div className="text-xs text-gray-500">{log.userEmail}</div>
+                                            <div className="font-semibold text-sm">{log.userName || log.adminName || '-'}</div>
+                                            <div className="text-xs text-gray-500">{log.userEmail || log.adminEmail || '-'}</div>
                                         </td>
-                                        <td className="text-sm">{log.description}</td>
+                                        <td className="text-sm">{log.description || log.message || '-'}</td>
                                         <td className="text-sm">
                                             {log.metadata?.adjustedByEmail ? (
                                                 <div>
@@ -310,12 +334,16 @@ export default function ActivityLogsViewer() {
                                                 <div className="text-gray-400 text-xs">ผู้ใช้เอง</div>
                                             )}
                                         </td>
-                                        <td className="text-right font-mono text-sm">{log.pointsBefore}</td>
-                                        <td className="text-right font-mono text-sm">{log.pointsAfter}</td>
+                                        <td className="text-right font-mono text-sm">{log.pointsBefore ?? '-'}</td>
+                                        <td className="text-right font-mono text-sm">{log.pointsAfter ?? '-'}</td>
                                         <td className="text-right font-mono text-sm">
-                                            <span className={log.pointsChange > 0 ? 'text-green-600' : log.pointsChange < 0 ? 'text-red-600' : ''}>
-                                                {log.pointsChange > 0 ? '+' : ''}{log.pointsChange}
-                                            </span>
+                                            {log.pointsChange !== undefined ? (
+                                                <span className={log.pointsChange > 0 ? 'text-green-600' : log.pointsChange < 0 ? 'text-red-600' : ''}>
+                                                    {log.pointsChange > 0 ? '+' : ''}{log.pointsChange}
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-400">-</span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))

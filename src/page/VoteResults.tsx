@@ -3,6 +3,8 @@ import { useVoteSettings, useCandidates, useVoteStats } from '../hooks/useVote';
 import { useAuth } from '../hooks/useAuth';
 import BottomNav from "../components/BottomNav";
 import AnimatedNumber from '../components/AnimatedNumber';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebaseApp';
 
 const CATEGORIES = [
     { id: 'band', name: 'Band', emoji: '🎸', description: 'วงดนตรี' },
@@ -14,8 +16,48 @@ export default function VoteResults() {
     const { currentUser } = useAuth();
     const [selectedCategory, setSelectedCategory] = useState<string>('band');
     const { categories: voteSettings, loading: settingsLoading } = useVoteSettings();
-    const { candidates, loading: candidatesLoading } = useCandidates(selectedCategory);
+    const { candidates: allCandidates, loading: candidatesLoading } = useCandidates(selectedCategory);
     const { totalVotes } = useVoteStats(selectedCategory);
+
+    // ✅ โหลด Podium Display Mode จาก settings/podium
+    const [scoreDisplayMode, setScoreDisplayMode] = useState<'app30' | 'purchase70' | 'total100'>('total100');
+    const [announcementVisible, setAnnouncementVisible] = useState(true);
+
+    useEffect(() => {
+        // โหลด Podium Settings
+        const loadPodiumSettings = async () => {
+            const podiumRef = doc(db, 'settings', 'podium');
+            const podiumSnap = await getDoc(podiumRef);
+            if (podiumSnap.exists()) {
+                const data = podiumSnap.data();
+                setScoreDisplayMode(data.displayMode || 'total100');
+            }
+        };
+
+        // โหลด Announcement Settings
+        const loadAnnouncementSettings = async () => {
+            const announcementRef = doc(db, 'settings', 'announcement');
+            const announcementSnap = await getDoc(announcementRef);
+            if (announcementSnap.exists()) {
+                const data = announcementSnap.data();
+                setAnnouncementVisible(data.visible !== false);
+            }
+        };
+
+        loadPodiumSettings();
+        loadAnnouncementSettings();
+    }, []);
+
+    // ✅ คำนวณคะแนนตามโหมด
+    const calculateScores = (candidate: any) => {
+        const score30 = (candidate.voteCount || 0) * 400 * 0.3; // App 30%
+        const score70 = (candidate.purchasePoints || 0) * 0.7;   // Purchase 70%
+        const totalScore = score30 + score70;                    // Total 100%
+        return { score30, score70, totalScore };
+    };
+
+    // ✅ Filter เฉพาะผู้สมัครที่ isActive = true (นับคะแนนใน Podium)
+    const activeCandidates = allCandidates.filter(c => c.isActive === true);
 
     const categorySettings = voteSettings[selectedCategory];
     const isOpen = categorySettings?.isOpen || false;
@@ -37,10 +79,28 @@ export default function VoteResults() {
         }
     }, [voteSettings, settingsLoading]);
 
-    // Sort candidates by vote count
-    const sortedCandidates = [...candidates].sort((a, b) => b.voteCount - a.voteCount);
-    const winner = sortedCandidates[0];
-    const maxVotes = winner?.voteCount || 1;
+    // ✅ Sort candidates ตามโหมดที่เลือก
+    const sortedCandidates = [...activeCandidates].sort((a, b) => {
+        const scoresA = calculateScores(a);
+        const scoresB = calculateScores(b);
+        
+        if (scoreDisplayMode === 'app30') {
+            return scoresB.score30 - scoresA.score30;
+        } else if (scoreDisplayMode === 'purchase70') {
+            return scoresB.score70 - scoresA.score70;
+        } else {
+            return scoresB.totalScore - scoresA.totalScore;
+        }
+    });
+
+    const maxVotes = sortedCandidates.length > 0 
+        ? (() => {
+            const scores = calculateScores(sortedCandidates[0]);
+            if (scoreDisplayMode === 'app30') return scores.score30;
+            if (scoreDisplayMode === 'purchase70') return scores.score70;
+            return scores.totalScore;
+        })()
+        : 1;
 
     if (settingsLoading || candidatesLoading) {
         return (
@@ -138,51 +198,46 @@ export default function VoteResults() {
                     </div>
                 </div>
 
-                {/* Vote Weight Notice - Elegant Card */}
-                <div className="mb-8 animate-fade-in">
-                    <div className="bg-gradient-to-br from-white/95 to-white/90 backdrop-blur-xl rounded-3xl p-6 md:p-8 shadow-2xl border border-white/50">
-                        <div className="text-center mb-5">
-                            <div className="inline-flex items-center gap-3 mb-2">
+                {/* Vote Weight Notice - ตามภาพ */}
+                {announcementVisible && (
+                    <div className="mb-8 animate-fade-in">
+                        <div className="bg-gradient-to-br from-white/95 to-white/90 backdrop-blur-xl rounded-3xl p-6 md:p-8 shadow-2xl border border-white/50">
+                            {/* Header */}
+                            <div className="flex items-center gap-3 mb-6">
                                 <span className="text-3xl">📋</span>
                                 <h3 className="font-bold text-2xl bg-gradient-to-r from-red-600 to-amber-600 bg-clip-text text-transparent">
                                     ประกาศสำคัญ
                                 </h3>
-                                <span className="text-3xl">📋</span>
                             </div>
-                        </div>
-                        <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-l-4 border-amber-500 rounded-xl p-5 mb-5 shadow-inner">
-                            <p className="text-center font-bold text-amber-900 text-lg">
-                                ⚠️ ผลการโหวตที่แสดงนี้ยังไม่ใช่ผลสุดท้าย
-                            </p>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-5 border border-blue-200 shadow-md">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                                        <span className="text-2xl font-bold text-white">30%</span>
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="text-gray-700 leading-relaxed">
-                                            คะแนนจากเว็บไซต์นี้คิดเป็นเพียง <span className="font-bold text-blue-700 text-lg">30%</span> ของคะแนนรวมทั้งหมด
-                                        </p>
-                                    </div>
+                            
+                            {/* กล่องสีเหลือง - ข้อความหลัก */}
+                            <div className="bg-gradient-to-r from-yellow-100 to-amber-100 border-l-4 border-yellow-500 rounded-2xl p-6 mb-4 shadow-md">
+                                <p className="text-gray-800 text-base leading-relaxed font-medium text-center">
+                                    ผลการโหวตที่แสดงนี้ยังไม่ใช่ผลสุดท้าย
+                                </p>
+                            </div>
+
+                            {/* รายการคะแนน */}
+                            <div className="space-y-4 pl-4">
+                                {/* 30% */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-2 h-2 bg-yellow-600 rounded-full mt-2 flex-shrink-0"></div>
+                                    <p className="text-gray-800 leading-relaxed">
+                                        คะแนนจากเว็บใช้ตีกลิดเป็นเพียง <span className="font-bold text-blue-700 text-lg">30%</span> ของคะแนนรวมทั้งหมด
+                                    </p>
                                 </div>
-                            </div>
-                            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-5 border border-purple-200 shadow-md">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                                        <span className="text-2xl font-bold text-white">70%</span>
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="text-gray-700 leading-relaxed">
-                                            คะแนนส่วนที่เหลือ <span className="font-bold text-purple-700 text-lg">70%</span> จะคิดจากรางวัลและการตัดสินภายในงาน EGOKE
-                                        </p>
-                                    </div>
+                                
+                                {/* 70% */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-2 h-2 bg-purple-600 rounded-full mt-2 flex-shrink-0"></div>
+                                    <p className="text-gray-800 leading-relaxed">
+                                        คะแนนส่วนที่เหลือ <span className="font-bold text-purple-700 text-lg">70%</span> จะคิดจากรางวัลและการตัดสินภายในงาน EGOKE สำหรับประกาศผู้ชนะในหมวด Band, Solo และ Cover Dance
+                                    </p>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 {/* Category Tabs - Modern Design */}
                 <div className="bg-gradient-to-br from-white/95 to-white/90 backdrop-blur-xl rounded-3xl p-5 shadow-2xl mb-8 animate-fade-in border border-white/50">
@@ -236,175 +291,257 @@ export default function VoteResults() {
                     </div>
                 )}
 
-                {/* Stats Summary - Elegant Cards */}
-                <div className="bg-gradient-to-br from-white/95 to-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-2xl mb-8 animate-fade-in border border-white/50">
-                    <div className="grid grid-cols-3 gap-6 text-center">
-                        <div className="bg-gradient-to-br from-red-50 to-pink-50 rounded-2xl p-5 border border-red-200 shadow-lg">
-                            <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent mb-2">
-                                <AnimatedNumber value={sortedCandidates.length} />
-                            </div>
-                            <div className="text-sm font-semibold text-gray-600">ผู้สมัคร</div>
-                        </div>
-                        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-5 border border-purple-200 shadow-lg">
-                            <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-2">
-                                {isStaff || !isOpen ? (
-                                    <AnimatedNumber value={totalVotes} />
-                                ) : (
-                                    <span>---</span>
-                                )}
-                            </div>
-                            <div className="text-sm font-semibold text-gray-600">
-                                {isStaff || !isOpen ? 'โหวตทั้งหมด' : 'ยังนับไม่ได้'}
-                            </div>
-                        </div>
-                        <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-5 border border-amber-200 shadow-lg">
-                            <div className="text-5xl mb-2 drop-shadow-md">{isOpen ? '🟢' : '🔴'}</div>
-                            <div className="text-sm font-semibold text-gray-600">{isOpen ? 'เปิดอยู่' : 'ปิดแล้ว'}</div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Podium Display - Top 3 with sparkles */}
+                {/* Podium Display - Top 3 Premium Design */}
                 {sortedCandidates.length >= 3 && (
                     <div className="mb-8 animate-fade-in">
-                        <div className="bg-gradient-to-br from-white/95 to-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/50">
-                            <div className="text-center mb-8">
-                                <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400 bg-clip-text text-transparent mb-2">
-                                    🏆 Top 3 🏆
-                                </h2>
-                                <p className="text-gray-600 font-medium">ผู้สมัครที่ได้รับความนิยมสูงสุด</p>
-                            </div>
+                        {/* Podium Container with Royal Theme */}
+                        <div className="relative overflow-hidden rounded-3xl shadow-2xl">
+                            {/* Luxurious Red Background */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-red-900 via-red-800 to-red-950" />
+                            {/* Golden Pattern Overlay */}
+                            <div className="absolute inset-0 opacity-10" style={{
+                                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FFD700' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                            }} />
+                            {/* Spotlight Effect */}
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-gradient-radial from-amber-400/20 via-transparent to-transparent rounded-full blur-3xl" />
                             
-                            <div className="flex items-end justify-center gap-6 max-w-4xl mx-auto">
-                                {/* 2nd Place - Silver */}
-                                <div className="flex-1 max-w-[160px] animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                                    <div className="relative">
-                                        {/* Sparkle effects */}
-                                        <div className="absolute -top-2 -left-2 text-2xl animate-pulse" style={{ animationDelay: '0.5s' }}>✨</div>
-                                        <div className="bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 rounded-t-3xl p-5 text-center border-4 border-gray-400 shadow-2xl">
-                                            <div className="w-20 h-20 mx-auto rounded-2xl overflow-hidden bg-white mb-3 shadow-xl ring-4 ring-gray-300/50">
-                                                {sortedCandidates[1].imageUrl ? (
-                                                    <img src={sortedCandidates[1].imageUrl} alt="" className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-4xl">🥈</div>
-                                                )}
-                                            </div>
-                                            <div className="font-bold text-white text-base mb-2 line-clamp-2 drop-shadow-md">{sortedCandidates[1].name}</div>
-                                            <div className="text-3xl font-bold text-white drop-shadow-lg">
-                                                <AnimatedNumber value={sortedCandidates[1].voteCount} />
-                                            </div>
-                                            <div className="text-xs text-white/80 mt-1">โหวต</div>
+                            {/* Golden Border Frame - ลด padding บนมือถือ */}
+                            <div className="relative p-1.5 md:p-3">
+                                <div className="border-4 border-amber-400/60 rounded-2xl bg-gradient-to-b from-amber-500/10 to-transparent p-4 md:p-8">
+                                    {/* Header with Golden Accents - ลดขนาดบนมือถือ */}
+                                    <div className="text-center mb-6 md:mb-10">
+                                        <div className="inline-flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
+                                            <div className="h-px w-8 md:w-20 bg-gradient-to-r from-transparent to-amber-400" />
+                                            <span className="text-3xl md:text-5xl drop-shadow-lg animate-pulse">🏆</span>
+                                            <div className="h-px w-8 md:w-20 bg-gradient-to-l from-transparent to-amber-400" />
                                         </div>
-                                        <div className="bg-gradient-to-b from-gray-400 to-gray-500 h-28 rounded-b-2xl flex items-center justify-center shadow-xl">
-                                            <div className="text-6xl drop-shadow-2xl">🥈</div>
-                                        </div>
-                                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-gray-600 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg">
-                                            2nd
+                                        <h2 className="text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-200 drop-shadow-2xl mb-2 md:mb-3 tracking-wide">
+                                            TOP 3
+                                        </h2>
+                                        <p className="text-amber-200/90 font-medium text-sm md:text-lg">ผู้สมัครที่ได้รับความนิยมสูงสุด</p>
+                                        <div className="flex items-center justify-center gap-2 mt-2 md:mt-3">
+                                            <div className="w-12 md:w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
+                                            <span className="text-amber-400 text-sm md:text-base">✦</span>
+                                            <div className="w-12 md:w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
                                         </div>
                                     </div>
-                                </div>
+                                    
+                                    {/* Podium Stage - ลด gap และขนาดบนมือถือ */}
+                                    <div className="flex items-end justify-center gap-2 md:gap-6 max-w-4xl mx-auto px-1 md:px-2">
+                                        {/* 2nd Place - Silver - ลดขนาดบนมือถือ */}
+                                        <div className="flex-1 max-w-[110px] md:max-w-[170px] animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                                            <div className="relative group">
+                                                {/* Glow Effect */}
+                                                <div className="absolute -inset-1 bg-gradient-to-r from-gray-400 via-gray-300 to-gray-400 rounded-3xl blur opacity-30 group-hover:opacity-50 transition duration-500" />
+                                                
+                                                {/* Medal */}
+                                                <div className="absolute -top-3 md:-top-5 left-1/2 -translate-x-1/2 z-20">
+                                                    <div className="relative">
+                                                        <span className="text-3xl md:text-5xl drop-shadow-xl">🥈</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Card Top */}
+                                                <div className="relative bg-gradient-to-br from-gray-200 via-gray-100 to-gray-300 rounded-t-2xl pt-6 md:pt-8 pb-3 md:pb-4 px-2 md:px-4 text-center border-2 border-amber-500/70 border-b-0 shadow-inner">
+                                                    {/* Golden Corner Decorations */}
+                                                    <div className="absolute top-0 left-0 w-4 md:w-6 h-4 md:h-6 border-t-2 border-l-2 border-amber-400 rounded-tl-xl" />
+                                                    <div className="absolute top-0 right-0 w-4 md:w-6 h-4 md:h-6 border-t-2 border-r-2 border-amber-400 rounded-tr-xl" />
+                                                    
+                                                    {/* Avatar */}
+                                                    <div className="relative w-14 h-14 md:w-20 md:h-20 mx-auto mb-2 md:mb-3">
+                                                        <div className="absolute -inset-1 bg-gradient-to-r from-gray-400 to-gray-300 rounded-xl blur-sm" />
+                                                        <div className="relative w-full h-full rounded-xl overflow-hidden bg-white ring-2 ring-amber-400/50 shadow-xl">
+                                                            {sortedCandidates[1].imageUrl ? (
+                                                                <img src={sortedCandidates[1].imageUrl} alt="" className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-2xl md:text-4xl bg-gradient-to-br from-gray-100 to-gray-200">2</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Name */}
+                                                    <div className="font-bold text-gray-800 text-xs md:text-base mb-1.5 md:mb-2 line-clamp-2 drop-shadow-sm leading-tight">{sortedCandidates[1].name}</div>
+                                                    
+                                                    {/* Vote Count */}
+                                                    <div className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-2 md:px-3 py-1 md:py-1.5 rounded-full inline-block shadow-lg">
+                                                        <span className="text-sm md:text-xl font-bold">
+                                                            <AnimatedNumber value={(() => {
+                                                                const scores = calculateScores(sortedCandidates[1]);
+                                                                if (scoreDisplayMode === 'app30') return Math.round(scores.score30);
+                                                                if (scoreDisplayMode === 'purchase70') return Math.round(scores.score70);
+                                                                return Math.round(scores.totalScore);
+                                                            })()} />
+                                                        </span>
+                                                        <span className="text-[10px] md:text-xs ml-0.5 md:ml-1 opacity-80">คะแนน</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Podium Base */}
+                                                <div className="relative bg-gradient-to-b from-gray-300 via-gray-400 to-gray-500 h-20 md:h-28 rounded-b-xl flex items-center justify-center border-2 border-amber-500/70 border-t-0 shadow-2xl overflow-hidden">
+                                                    {/* Shine Effect */}
+                                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shine" />
+                                                    <div className="text-4xl md:text-6xl font-black text-white/90 drop-shadow-2xl" style={{ textShadow: '3px 3px 6px rgba(0,0,0,0.5)' }}>2</div>
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                {/* 1st Place - Gold */}
-                                <div className="flex-1 max-w-[190px] animate-fade-in -mt-4" style={{ animationDelay: '0.1s' }}>
-                                    <div className="relative">
-                                        {/* Crown and sparkles */}
-                                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-5xl animate-bounce-soft">👑</div>
-                                        <div className="absolute -top-1 -right-1 text-2xl animate-pulse" style={{ animationDelay: '0.3s' }}>✨</div>
-                                        <div className="absolute -top-1 -left-1 text-2xl animate-pulse" style={{ animationDelay: '0.7s' }}>✨</div>
-                                        <div className="bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-500 rounded-t-3xl p-6 text-center border-4 border-yellow-500 shadow-2xl ring-4 ring-amber-300/50">
-                                            <div className="w-24 h-24 mx-auto rounded-2xl overflow-hidden bg-white mb-3 border-4 border-yellow-400 shadow-2xl ring-4 ring-yellow-300/30">
-                                                {sortedCandidates[0].imageUrl ? (
-                                                    <img src={sortedCandidates[0].imageUrl} alt="" className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-5xl">🏆</div>
-                                                )}
+                                        {/* 1st Place - Gold Champion - ลดขนาดบนมือถือ */}
+                                        <div className="flex-1 max-w-[130px] md:max-w-[200px] animate-fade-in -mt-4 md:-mt-6" style={{ animationDelay: '0.1s' }}>
+                                            <div className="relative group">
+                                                {/* Glow Effect */}
+                                                <div className="absolute -inset-2 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 rounded-3xl blur-lg opacity-50 group-hover:opacity-70 transition duration-500 animate-pulse" />
+                                                
+                                                {/* Crown */}
+                                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-20">
+                                                    <div className="relative">
+                                                        <span className="text-5xl md:text-6xl drop-shadow-2xl animate-bounce-soft">👑</span>
+                                                        {/* Sparkles */}
+                                                        <span className="absolute -top-2 -left-4 text-xl animate-pulse" style={{ animationDelay: '0.2s' }}>✨</span>
+                                                        <span className="absolute -top-2 -right-4 text-xl animate-pulse" style={{ animationDelay: '0.5s' }}>✨</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Card Top - ลดขนาดบนมือถือ */}
+                                                <div className="relative bg-gradient-to-br from-amber-200 via-yellow-100 to-amber-300 rounded-t-2xl pt-7 md:pt-10 pb-3 md:pb-5 px-2 md:px-4 text-center border-3 border-amber-500 border-b-0 shadow-inner">
+                                                    {/* Golden Corner Decorations */}
+                                                    <div className="absolute top-0 left-0 w-5 md:w-8 h-5 md:h-8 border-t-3 border-l-3 border-amber-500 rounded-tl-xl" />
+                                                    <div className="absolute top-0 right-0 w-5 md:w-8 h-5 md:h-8 border-t-3 border-r-3 border-amber-500 rounded-tr-xl" />
+                                                    
+                                                    {/* Avatar */}
+                                                    <div className="relative w-16 h-16 md:w-24 md:h-24 mx-auto mb-2 md:mb-4">
+                                                        <div className="absolute -inset-1.5 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 rounded-xl blur-sm animate-pulse" />
+                                                        <div className="relative w-full h-full rounded-xl overflow-hidden bg-white ring-3 ring-amber-500 shadow-2xl">
+                                                            {sortedCandidates[0].imageUrl ? (
+                                                                <img src={sortedCandidates[0].imageUrl} alt="" className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-3xl md:text-5xl bg-gradient-to-br from-amber-100 to-yellow-200">1</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Name */}
+                                                    <div className="font-bold text-amber-900 text-sm md:text-lg mb-1.5 md:mb-3 line-clamp-2 drop-shadow-sm leading-tight">{sortedCandidates[0].name}</div>
+                                                    
+                                                    {/* Vote Count */}
+                                                    <div className="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 text-white px-2.5 md:px-4 py-1 md:py-2 rounded-full inline-block shadow-lg">
+                                                        <span className="text-base md:text-2xl font-bold">
+                                                            <AnimatedNumber value={(() => {
+                                                                const scores = calculateScores(sortedCandidates[0]);
+                                                                if (scoreDisplayMode === 'app30') return Math.round(scores.score30);
+                                                                if (scoreDisplayMode === 'purchase70') return Math.round(scores.score70);
+                                                                return Math.round(scores.totalScore);
+                                                            })()} />
+                                                        </span>
+                                                        <span className="text-[10px] md:text-sm ml-0.5 md:ml-1.5 opacity-90">คะแนน</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Podium Base - Tallest */}
+                                                <div className="relative bg-gradient-to-b from-amber-400 via-yellow-500 to-amber-600 h-24 md:h-36 rounded-b-xl flex items-center justify-center border-3 border-amber-500 border-t-0 shadow-2xl overflow-hidden">
+                                                    {/* Shine Effect */}
+                                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shine" />
+                                                    <div className="text-5xl md:text-7xl font-black text-white drop-shadow-2xl" style={{ textShadow: '4px 4px 8px rgba(0,0,0,0.4)' }}>1</div>
+                                                </div>
                                             </div>
-                                            <div className="font-bold text-amber-900 text-lg mb-2 line-clamp-2 drop-shadow-md">{sortedCandidates[0].name}</div>
-                                            <div className="text-4xl font-bold bg-gradient-to-r from-amber-900 to-yellow-900 bg-clip-text text-transparent drop-shadow-lg">
-                                                <AnimatedNumber value={sortedCandidates[0].voteCount} />
+                                        </div>
+
+                                        {/* 3rd Place - Bronze - ลดขนาดบนมือถือ */}
+                                        <div className="flex-1 max-w-[110px] md:max-w-[170px] animate-fade-in" style={{ animationDelay: '0.3s' }}>
+                                            <div className="relative group">
+                                                {/* Glow Effect */}
+                                                <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 via-amber-600 to-orange-500 rounded-3xl blur opacity-30 group-hover:opacity-50 transition duration-500" />
+                                                
+                                                {/* Medal */}
+                                                <div className="absolute -top-3 md:-top-5 left-1/2 -translate-x-1/2 z-20">
+                                                    <div className="relative">
+                                                        <span className="text-3xl md:text-5xl drop-shadow-xl">🥉</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Card Top */}
+                                                <div className="relative bg-gradient-to-br from-orange-200 via-amber-100 to-orange-300 rounded-t-2xl pt-6 md:pt-8 pb-3 md:pb-4 px-2 md:px-4 text-center border-2 border-amber-500/70 border-b-0 shadow-inner">
+                                                    {/* Golden Corner Decorations */}
+                                                    <div className="absolute top-0 left-0 w-4 md:w-6 h-4 md:h-6 border-t-2 border-l-2 border-amber-400 rounded-tl-xl" />
+                                                    <div className="absolute top-0 right-0 w-4 md:w-6 h-4 md:h-6 border-t-2 border-r-2 border-amber-400 rounded-tr-xl" />
+                                                    
+                                                    {/* Avatar */}
+                                                    <div className="relative w-14 h-14 md:w-20 md:h-20 mx-auto mb-2 md:mb-3">
+                                                        <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl blur-sm" />
+                                                        <div className="relative w-full h-full rounded-xl overflow-hidden bg-white ring-2 ring-amber-400/50 shadow-xl">
+                                                            {sortedCandidates[2].imageUrl ? (
+                                                                <img src={sortedCandidates[2].imageUrl} alt="" className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-2xl md:text-4xl bg-gradient-to-br from-orange-100 to-amber-200">3</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Name */}
+                                                    <div className="font-bold text-orange-900 text-xs md:text-base mb-1.5 md:mb-2 line-clamp-2 drop-shadow-sm leading-tight">{sortedCandidates[2].name}</div>
+                                                    
+                                                    {/* Vote Count */}
+                                                    <div className="bg-gradient-to-r from-orange-600 to-amber-600 text-white px-2 md:px-3 py-1 md:py-1.5 rounded-full inline-block shadow-lg">
+                                                        <span className="text-sm md:text-xl font-bold">
+                                                            <AnimatedNumber value={(() => {
+                                                                const scores = calculateScores(sortedCandidates[2]);
+                                                                if (scoreDisplayMode === 'app30') return Math.round(scores.score30);
+                                                                if (scoreDisplayMode === 'purchase70') return Math.round(scores.score70);
+                                                                return Math.round(scores.totalScore);
+                                                            })()} />
+                                                        </span>
+                                                        <span className="text-[10px] md:text-xs ml-0.5 md:ml-1 opacity-80">คะแนน</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Podium Base - Shortest */}
+                                                <div className="relative bg-gradient-to-b from-orange-400 via-orange-500 to-orange-600 h-16 md:h-24 rounded-b-xl flex items-center justify-center border-2 border-amber-500/70 border-t-0 shadow-2xl overflow-hidden">
+                                                    {/* Shine Effect */}
+                                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shine" />
+                                                    <div className="text-4xl md:text-6xl font-black text-white/90 drop-shadow-2xl" style={{ textShadow: '3px 3px 6px rgba(0,0,0,0.5)' }}>3</div>
+                                                </div>
                                             </div>
-                                            <div className="text-sm text-amber-900/80 mt-1 font-semibold">โหวต</div>
-                                        </div>
-                                        <div className="bg-gradient-to-b from-yellow-400 to-amber-500 h-36 rounded-b-2xl flex items-center justify-center shadow-2xl">
-                                            <div className="text-7xl drop-shadow-2xl">🥇</div>
-                                        </div>
-                                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-5 py-1.5 rounded-full text-base font-bold shadow-2xl ring-2 ring-white">
-                                            🏆 WINNER
                                         </div>
                                     </div>
-                                </div>
-
-                                {/* 3rd Place - Bronze */}
-                                <div className="flex-1 max-w-[160px] animate-fade-in" style={{ animationDelay: '0.3s' }}>
-                                    <div className="relative">
-                                        {/* Sparkle effect */}
-                                        <div className="absolute -top-2 -right-2 text-2xl animate-pulse" style={{ animationDelay: '0.9s' }}>✨</div>
-                                        <div className="bg-gradient-to-br from-amber-500 via-amber-600 to-orange-700 rounded-t-3xl p-5 text-center border-4 border-amber-700 shadow-2xl">
-                                            <div className="w-20 h-20 mx-auto rounded-2xl overflow-hidden bg-white mb-3 shadow-xl ring-4 ring-amber-500/50">
-                                                {sortedCandidates[2].imageUrl ? (
-                                                    <img src={sortedCandidates[2].imageUrl} alt="" className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-4xl">🥉</div>
-                                                )}
+                                    
+                                    {/* Stats Summary - Inside Podium - ปรับขนาดให้เหมาะกับมือถือ */}
+                                    <div className="mt-6 md:mt-8 pt-4 md:pt-6 border-t-2 border-amber-400/30">
+                                        <div className="grid grid-cols-3 gap-2 md:gap-4">
+                                            {/* ผู้สมัคร */}
+                                            <div className="bg-gradient-to-br from-white/95 to-amber-50/90 rounded-lg md:rounded-xl p-2 md:p-4 border-2 border-amber-400/50 shadow-lg backdrop-blur-sm">
+                                                <div className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-red-600 to-amber-600 bg-clip-text text-transparent mb-0.5 md:mb-1">
+                                                    <AnimatedNumber value={sortedCandidates.length} />
+                                                </div>
+                                                <div className="text-[10px] md:text-sm font-semibold text-amber-900/80 leading-tight">ผู้สมัคร</div>
                                             </div>
-                                            <div className="font-bold text-white text-base mb-2 line-clamp-2 drop-shadow-md">{sortedCandidates[2].name}</div>
-                                            <div className="text-3xl font-bold text-white drop-shadow-lg">
-                                                <AnimatedNumber value={sortedCandidates[2].voteCount} />
+                                            
+                                            {/* โหวตทั้งหมด */}
+                                            <div className="bg-gradient-to-br from-white/95 to-amber-50/90 rounded-lg md:rounded-xl p-2 md:p-4 border-2 border-amber-400/50 shadow-lg backdrop-blur-sm">
+                                                <div className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent mb-0.5 md:mb-1">
+                                                    {isStaff || !isOpen ? (
+                                                        <AnimatedNumber value={totalVotes} />
+                                                    ) : (
+                                                        <span className="text-xl md:text-4xl">---</span>
+                                                    )}
+                                                </div>
+                                                <div className="text-[10px] md:text-sm font-semibold text-amber-900/80 leading-tight">
+                                                    {isStaff || !isOpen ? 'โหวตทั้งหมด' : 'ยังนับไม่ได้'}
+                                                </div>
                                             </div>
-                                            <div className="text-xs text-white/80 mt-1">โหวต</div>
-                                        </div>
-                                        <div className="bg-gradient-to-b from-amber-600 to-orange-700 h-24 rounded-b-2xl flex items-center justify-center shadow-xl">
-                                            <div className="text-6xl drop-shadow-2xl">🥉</div>
-                                        </div>
-                                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-amber-700 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg">
-                                            3rd
+                                            
+                                            {/* สถานะ */}
+                                            <div className="bg-gradient-to-br from-white/95 to-amber-50/90 rounded-lg md:rounded-xl p-2 md:p-4 border-2 border-amber-400/50 shadow-lg backdrop-blur-sm">
+                                                <div className={`text-2xl md:text-4xl mb-0.5 md:mb-1 ${isOpen ? 'text-green-500' : 'text-red-500'}`}>
+                                                    {isOpen ? '●' : '●'}
+                                                </div>
+                                                <div className="text-[10px] md:text-sm font-semibold text-amber-900/80 leading-tight">{isOpen ? 'เปิดอยู่' : 'ปิดแล้ว'}</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                )}
-
-                {/* Winner Card (if closed) */}
-                {!isOpen && winner && (
-                    <div className="bg-gradient-to-br from-amber-400 via-yellow-400 to-amber-500 rounded-3xl p-8 shadow-2xl mb-6 animate-fade-in border-4 border-amber-600">
-                        <div className="text-center mb-4">
-                            <div className="text-6xl mb-3 animate-bounce-soft">🏆</div>
-                            <h2 className="text-3xl font-bold text-white drop-shadow-lg mb-2">ผู้ชนะ</h2>
-                        </div>
-                        
-                        <div className="bg-white rounded-2xl p-6 shadow-xl">
-                            <div className="flex items-center gap-6">
-                                <div className="w-24 h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-amber-200 to-yellow-200 flex-shrink-0 shadow-lg">
-                                    {winner.imageUrl ? (
-                                        <img 
-                                            src={winner.imageUrl} 
-                                            alt={winner.name}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-5xl">
-                                            {winner.category === 'band' && '�'}
-                                            {winner.category === 'solo' && '�'}
-                                            {winner.category === 'cover' && '�'}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="text-2xl font-bold text-gray-800 mb-2">{winner.name}</h3>
-                                    <p className="text-gray-600 mb-3">{winner.description}</p>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-4xl font-bold text-red-600">{winner.voteCount}</span>
-                                        <span className="text-gray-500">โหวต</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Results List */}
+                )}                {/* Results List */}
                 <div className="space-y-4 animate-fade-in">
                     {sortedCandidates.map((candidate, index) => {
                         const percentage = totalVotes > 0 ? (candidate.voteCount / totalVotes * 100) : 0;
@@ -456,7 +593,12 @@ export default function VoteResults() {
                                         {/* Votes */}
                                         <div className="text-right">
                                             <div className="text-3xl font-bold text-red-600">
-                                                <AnimatedNumber value={candidate.voteCount} />
+                                                <AnimatedNumber value={(() => {
+                                                    const scores = calculateScores(candidate);
+                                                    if (scoreDisplayMode === 'app30') return Math.round(scores.score30);
+                                                    if (scoreDisplayMode === 'purchase70') return Math.round(scores.score70);
+                                                    return Math.round(scores.totalScore);
+                                                })()} />
                                             </div>
                                             <div className="text-sm text-gray-500">{percentage.toFixed(1)}%</div>
                                         </div>

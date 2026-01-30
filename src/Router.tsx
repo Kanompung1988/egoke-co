@@ -6,16 +6,19 @@ import Game from "./page/Game"
 import Profile from "./page/Profile"
 import Contact from "./page/Vap-ig"
 import QRScan from "./page/QRScan"
+import RegisterScan from "./page/RegisterScan"
 import Admin from "./page/Admin"
 import SuperAdmin from "./page/SuperAdmin"
 import Register from "./page/Register"
 import VoteResults from "./page/VoteResults"
 import RedeemPrize from "./page/RedeemPrize"
 import WarpStatus from "./page/WarpStatus"
+import BonusNotification from "./components/BonusNotification"
 
 export default function AppRouter() {
     return (
         <BrowserRouter>
+            <BonusNotification />
             <Routes>
                 <Route path="/" element={<Login />} />
                 <Route path="/Home" element={<Home />} />
@@ -26,6 +29,7 @@ export default function AppRouter() {
                 <Route path="/warp-status" element={<WarpStatus />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/qrscan" element={<QRScan />} />
+                <Route path="/register-scan" element={<RegisterScan />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/redeem/:ticketId" element={<RedeemPrize />} />
                 <Route path="/admin" element={<Admin />} />

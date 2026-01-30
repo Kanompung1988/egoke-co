@@ -242,10 +242,10 @@ export default function Home() {
                             <p className="text-gray-600 text-sm mb-4">ขอบคุณที่เข้าร่วมงาน EG'OKE 2025<br/>มาสนุกกับกิจกรรมมากมายกันเถอะ!</p>
 
                             <button
-                                onClick={() => { handleModalClose(); navigate('/game'); }}
+                                onClick={() => { handleModalClose(); navigate('/profile'); }}
                                 className="w-full bg-red-500 hover:bg-red-600 text-white rounded-xl py-3 font-bold shadow-lg transition-all active:scale-95 mb-3"
                             >
-                                เริ่มหมุนวงล้อ
+                                เปิดหน้า Profile
                             </button>
                             
                             <div className="flex items-center justify-between text-sm">

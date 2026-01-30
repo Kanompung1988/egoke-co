@@ -26,7 +26,7 @@ export default function GameWheel({
 
     // Prepare data for chart
     const chartData = useMemo(() => ({
-        labels: prizes.map((_, index) => `${index + 1}`), // Show numbers instead of labels
+        labels: prizes.map(() => '?'), // Show question marks instead of numbers
         datasets: [{
             data: prizes.map(() => 1), // Equal segments
             backgroundColor: prizes.map(p => p.color || '#dc2626'),

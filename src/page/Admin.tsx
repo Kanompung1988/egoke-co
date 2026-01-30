@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useVoteSettings, useCandidates, useVoteStats } from '../hooks/useVote';
+import { useIGPageSettings } from '../hooks/useIGPageSettings';
 import { db, getAllUsers, setUserRole, uploadImage } from '../firebaseApp';
-import { doc, updateDoc, collection, addDoc, deleteDoc, Timestamp, getDocs, query, where, setDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, deleteDoc, Timestamp, getDocs, query, where, setDoc, getDoc, writeBatch } from 'firebase/firestore';
 import BottomNav from '../components/BottomNav';
 import type { VoteCategory } from '../hooks/useVote'; // นำเข้า type ถ้ามี
 import { logAdminAdjustPoints, logAttendanceCheck } from '../utils/activityLogger';
@@ -36,6 +37,7 @@ export default function Admin() {
     const { currentUser } = useAuth();
     const navigate = useNavigate();
     const { categories: voteSettings, loading } = useVoteSettings();
+    const { settings: igPageSettings, toggleIGPage } = useIGPageSettings();
     const [selectedCategory, setSelectedCategory] = useState('band');
     const { candidates } = useCandidates(selectedCategory);
     const { totalVotes } = useVoteStats(selectedCategory);
@@ -69,6 +71,11 @@ export default function Admin() {
         description: '',
     });
 
+    // ✅ เพิ่ม State สำหรับระบบใหม่
+    const [editingPurchasePoints, setEditingPurchasePoints] = useState<{ [key: string]: number }>({});
+    const [scoreDisplayMode, setScoreDisplayMode] = useState<'app30' | 'purchase70' | 'total100'>('total100');
+    const [announcementVisible, setAnnouncementVisible] = useState(true);
+
     const isAdmin = currentUser?.role === 'admin';
     const isSuperAdmin = currentUser?.role === 'superadmin';
     const canManageUsers = isAdmin || isSuperAdmin;
@@ -87,6 +94,38 @@ export default function Admin() {
             loadUsers();
         }
     }, [canManageUsers, activeTab]);
+
+    // ✅ โหลด Podium Settings
+    useEffect(() => {
+        const loadPodiumSettings = async () => {
+            try {
+                const docRef = doc(db, 'settings', 'podium');
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    setScoreDisplayMode(docSnap.data().displayMode || 'total100');
+                }
+            } catch (error) {
+                console.error('Error loading podium settings:', error);
+            }
+        };
+        loadPodiumSettings();
+    }, []);
+
+    // ✅ โหลด Announcement Settings
+    useEffect(() => {
+        const loadAnnouncementSettings = async () => {
+            try {
+                const docRef = doc(db, 'settings', 'announcement');
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    setAnnouncementVisible(docSnap.data().visible ?? true);
+                }
+            } catch (error) {
+                console.error('Error loading announcement settings:', error);
+            }
+        };
+        loadAnnouncementSettings();
+    }, []);
 
     const loadUsers = async () => {
         setLoadingUsers(true);
@@ -173,6 +212,8 @@ export default function Admin() {
                 [`attendance.${day}`]: checked
             });
             
+            const currentPoints = userData?.points || 0;
+            
             // บันทึก activity log
             await logAttendanceCheck(
                 userId,
@@ -182,7 +223,8 @@ export default function Admin() {
                 checked,
                 currentUser?.uid || '',
                 currentUser?.email || '',
-                userData?.points || 0
+                currentPoints,
+                currentPoints // pointsAfter เท่าเดิมเพราะแค่เช็คอิน ไม่ได้เพิ่ม/ลดแต้ม
             );
             
             setUsers(users.map(u => 
@@ -300,11 +342,162 @@ export default function Admin() {
 
                 alert(`⏸️ ปิดการโหวตและส่งคะแนนไป Google Sheet เรียบร้อยแล้ว! ✅`);
             } else {
-                alert(`✅ เปิดการโหวต ${category} แล้ว`);
+                // ✅ เปิดโหวต → เพิ่มสิทธิ์โหวตฟรี 1 ครั้งให้ทุกคน
+                console.log(`🔄 เปิดการโหวต ${category} - กำลังแจกสิทธิ์โหวตฟรีให้ทุกคน...`);
+                
+                try {
+                    const usersSnapshot = await getDocs(collection(db, 'users'));
+                    const batch = writeBatch(db);
+                    let grantedCount = 0;
+
+                    usersSnapshot.docs.forEach((userDoc) => {
+                        const currentRights = userDoc.data().voteRights || {};
+                        const currentCategoryRights = currentRights[category] || 0;
+                        
+                        // เพิ่มสิทธิ์โหวต 1 ครั้งในหมวดนี้
+                        batch.update(userDoc.ref, {
+                            [`voteRights.${category}`]: currentCategoryRights + 1
+                        });
+                        grantedCount++;
+                    });
+
+                    await batch.commit();
+                    
+                    console.log(`✅ แจกสิทธิ์โหวตสำเร็จ: ${grantedCount} คน`);
+                    
+                    // บันทึก Activity Log
+                    await addDoc(collection(db, 'activityLogs'), {
+                        type: 'grant_free_vote',
+                        category: category,
+                        adminId: currentUser?.uid,
+                        adminEmail: currentUser?.email,
+                        adminName: currentUser?.displayName || currentUser?.email,
+                        affectedUsers: grantedCount,
+                        timestamp: Timestamp.now(),
+                        message: `เปิดการโหวต ${category} - แจกสิทธิ์โหวตฟรี 1 ครั้งให้ ${grantedCount} คน`
+                    });
+                    
+                    alert(`✅ เปิดการโหวต ${category} และแจกสิทธิ์โหวตฟรี 1 ครั้งให้ ${grantedCount} คนแล้ว! 🎉`);
+                } catch (grantError) {
+                    console.error('❌ Error granting free votes:', grantError);
+                    alert(`⚠️ เปิดการโหวต ${category} แล้ว แต่เกิดข้อผิดพลาดในการแจกสิทธิ์โหวตฟรี`);
+                }
             }
             
         } catch (error) {
             console.error('❌ Failed to toggle category:', error);
+            alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
+        }
+    };
+
+    // ✅ ฟังก์ชันคำนวณคะแนน
+    const calculateScores = (candidate: any) => {
+        const voteCount = candidate.voteCount || 0;
+        const purchasePoints = candidate.purchasePoints || 0;
+        
+        const score30 = voteCount * 400 * 0.3;
+        const score70 = purchasePoints * 0.7;
+        const totalScore = score30 + score70;
+        
+        return { score30, score70, totalScore };
+    };
+
+    // ✅ ฟังก์ชันอัปเดตคะแนนซื้อของ
+    const updatePurchasePoints = async (candidateId: string, points: number) => {
+        try {
+            const candidateRef = doc(db, 'candidates', candidateId);
+            await updateDoc(candidateRef, {
+                purchasePoints: points
+            });
+
+            // บันทึก Activity Log
+            await addDoc(collection(db, 'activityLogs'), {
+                type: 'update_purchase_points',
+                candidateId: candidateId,
+                candidateName: candidates.find(c => c.id === candidateId)?.name,
+                category: selectedCategory,
+                points: points,
+                adminId: currentUser?.uid,
+                adminEmail: currentUser?.email,
+                adminName: currentUser?.displayName || currentUser?.email,
+                timestamp: Timestamp.now(),
+                message: `อัปเดตคะแนนซื้อของเป็น ${points.toLocaleString()}`
+            });
+
+            alert('✅ อัปเดตคะแนนซื้อของสำเร็จ!');
+            
+            // Clear editing state
+            setEditingPurchasePoints(prev => {
+                const newState = { ...prev };
+                delete newState[candidateId];
+                return newState;
+            });
+        } catch (error) {
+            console.error('Error updating purchase points:', error);
+            alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
+        }
+    };
+
+    // ✅ ฟังก์ชันเปลี่ยนโหมด Podium
+    const updateDisplayMode = async (mode: 'app30' | 'purchase70' | 'total100') => {
+        try {
+            await setDoc(doc(db, 'settings', 'podium'), {
+                displayMode: mode,
+                updatedAt: Timestamp.now(),
+                updatedBy: currentUser?.email
+            });
+            
+            setScoreDisplayMode(mode);
+            
+            const modeNames = {
+                app30: 'App (30%)',
+                purchase70: 'ซื้อของ (70%)',
+                total100: 'รวม (100%)'
+            };
+            
+            alert(`✅ เปลี่ยนโหมดเป็น ${modeNames[mode]} แล้ว`);
+            
+            // บันทึก Activity Log
+            await addDoc(collection(db, 'activityLogs'), {
+                type: 'change_podium_mode',
+                mode: mode,
+                adminId: currentUser?.uid,
+                adminEmail: currentUser?.email,
+                adminName: currentUser?.displayName || currentUser?.email,
+                timestamp: Timestamp.now(),
+                message: `เปลี่ยนโหมดแสดงคะแนน Podium เป็น ${modeNames[mode]}`
+            });
+        } catch (error) {
+            console.error('Error updating display mode:', error);
+            alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
+        }
+    };
+
+    // ✅ ฟังก์ชันเปิด/ปิดประกาศ
+    const toggleAnnouncement = async () => {
+        try {
+            await setDoc(doc(db, 'settings', 'announcement'), {
+                visible: !announcementVisible,
+                updatedAt: Timestamp.now(),
+                updatedBy: currentUser?.email
+            });
+            
+            setAnnouncementVisible(!announcementVisible);
+            
+            alert(`✅ ${!announcementVisible ? 'เปิด' : 'ปิด'}ประกาศสำคัญแล้ว`);
+            
+            // บันทึก Activity Log
+            await addDoc(collection(db, 'activityLogs'), {
+                type: 'toggle_announcement',
+                visible: !announcementVisible,
+                adminId: currentUser?.uid,
+                adminEmail: currentUser?.email,
+                adminName: currentUser?.displayName || currentUser?.email,
+                timestamp: Timestamp.now(),
+                message: `${!announcementVisible ? 'เปิด' : 'ปิด'}ประกาศสำคัญ`
+            });
+        } catch (error) {
+            console.error('Error toggling announcement:', error);
             alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
         }
     };
@@ -391,6 +584,8 @@ export default function Admin() {
                 category: selectedCategory,
                 voteCount: 0,
                 order: maxOrder + 1,
+                isVisible: false, // ✅ Default: ไม่แสดงให้ User เห็น
+                isActive: false,  // ✅ Default: ไม่นับคะแนนใน Podium
                 createdAt: Timestamp.now(),
                 createdBy: currentUser?.uid || 'unknown'
             });
@@ -423,6 +618,64 @@ export default function Admin() {
         } catch (error) {
             console.error('❌ Failed to delete candidate:', error);
             alert('เกิดข้อผิดพลาดในการลบผู้สมัคร: ' + (error as Error).message);
+        }
+    };
+
+    // ✅ Toggle isVisible/isActive สำหรับผู้สมัครแต่ละคน
+    const toggleCandidateVisibility = async (candidateId: string, currentValue: boolean) => {
+        try {
+            await updateDoc(doc(db, 'candidates', candidateId), {
+                isVisible: !currentValue
+            });
+        } catch (error) {
+            console.error('❌ Failed to toggle visibility:', error);
+            alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
+        }
+    };
+
+    const toggleCandidateActive = async (candidateId: string, currentValue: boolean) => {
+        try {
+            await updateDoc(doc(db, 'candidates', candidateId), {
+                isActive: !currentValue
+            });
+        } catch (error) {
+            console.error('❌ Failed to toggle active:', error);
+            alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
+        }
+    };
+
+    // ✅ Bulk Actions - เปิด/ปิดทั้งหมด
+    const bulkToggleVisibility = async (value: boolean) => {
+        if (!confirm(`ต้องการ${value ? 'เปิด' : 'ปิด'}การแสดงผู้สมัครทั้งหมดในหมวด ${voteSettings[selectedCategory]?.title} หรือไม่?`)) return;
+        
+        try {
+            const batch = writeBatch(db);
+            candidates.forEach((candidate) => {
+                const ref = doc(db, 'candidates', candidate.id);
+                batch.update(ref, { isVisible: value });
+            });
+            await batch.commit();
+            alert(`✅ ${value ? 'เปิด' : 'ปิด'}การแสดงผู้สมัครทั้งหมดสำเร็จ`);
+        } catch (error) {
+            console.error('❌ Bulk toggle failed:', error);
+            alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
+        }
+    };
+
+    const bulkToggleActive = async (value: boolean) => {
+        if (!confirm(`ต้องการ${value ? 'เปิด' : 'ปิด'}การนับคะแนนผู้สมัครทั้งหมดในหมวด ${voteSettings[selectedCategory]?.title} หรือไม่?`)) return;
+        
+        try {
+            const batch = writeBatch(db);
+            candidates.forEach((candidate) => {
+                const ref = doc(db, 'candidates', candidate.id);
+                batch.update(ref, { isActive: value });
+            });
+            await batch.commit();
+            alert(`✅ ${value ? 'เปิด' : 'ปิด'}การนับคะแนนผู้สมัครทั้งหมดสำเร็จ`);
+        } catch (error) {
+            console.error('❌ Bulk toggle failed:', error);
+            alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
         }
     };
 
@@ -795,6 +1048,136 @@ export default function Admin() {
                             </div>
                         </div>
 
+                        {/* IG Page Control - NEW */}
+                        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 shadow-xl mb-6 border-2 border-indigo-200">
+                            <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                📱 ควบคุมหน้า IG
+                            </h2>
+                            <div className="bg-white rounded-xl p-6 border-2 border-indigo-300">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <div className="font-bold text-lg text-gray-800 mb-1">
+                                            🎭 หน้าส่งวาร์ป Instagram
+                                        </div>
+                                        <div className="text-sm text-gray-600">
+                                            เปิด/ปิดให้ผู้ใช้เข้าถึงหน้า IG ได้
+                                        </div>
+                                    </div>
+                                    
+                                    <button
+                                        onClick={async () => {
+                                            const success = await toggleIGPage(!igPageSettings.isOpen);
+                                            if (success) {
+                                                console.log('IG Page toggled successfully');
+                                            } else {
+                                                alert('เกิดข้อผิดพลาดในการเปลี่ยนสถานะ');
+                                            }
+                                        }}
+                                        className={`px-6 py-3 rounded-xl font-bold transition-all shadow-lg min-w-[140px] ${
+                                            igPageSettings.isOpen
+                                                ? 'bg-red-500 hover:bg-red-600 text-white'
+                                                : 'bg-green-500 hover:bg-green-600 text-white'
+                                        }`}
+                                    >
+                                        {igPageSettings.isOpen ? '🔴 ปิดหน้า IG' : '▶️ เปิดหน้า IG'}
+                                    </button>
+                                </div>
+                                
+                                <div className={`mt-4 text-center font-bold text-lg ${
+                                    igPageSettings.isOpen ? 'text-green-600' : 'text-red-600'
+                                }`}>
+                                    {igPageSettings.isOpen ? '✅ เปิดใช้งาน' : '⏸️ ปิดใช้งาน'}
+                                </div>
+                                
+                                <div className="mt-4 text-xs text-gray-500 text-center bg-gray-50 rounded-lg p-3">
+                                    💡 เมื่อปิด: ผู้ใช้ทั่วไปจะเข้าหน้า IG ไม่ได้ (Staff/Admin ยังเข้าได้)
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ✅ Podium Settings - NEW */}
+                        <div className="bg-white rounded-2xl p-6 shadow-xl mb-6">
+                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                🏆 จัดการ Podium
+                            </h2>
+                            
+                            <div>
+                                <label className="block text-sm font-semibold mb-3 text-gray-700">
+                                    โหมดแสดงคะแนน:
+                                </label>
+                                
+                                <div className="flex flex-wrap gap-3">
+                                    <button
+                                        onClick={() => updateDisplayMode('app30')}
+                                        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                                            scoreDisplayMode === 'app30'
+                                                ? 'bg-blue-500 text-white shadow-lg scale-105'
+                                                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                                        }`}
+                                    >
+                                        📊 App (30%)
+                                    </button>
+                                    
+                                    <button
+                                        onClick={() => updateDisplayMode('purchase70')}
+                                        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                                            scoreDisplayMode === 'purchase70'
+                                                ? 'bg-purple-500 text-white shadow-lg scale-105'
+                                                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                                        }`}
+                                    >
+                                        💰 ซื้อของ (70%)
+                                    </button>
+                                    
+                                    <button
+                                        onClick={() => updateDisplayMode('total100')}
+                                        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                                            scoreDisplayMode === 'total100'
+                                                ? 'bg-green-500 text-white shadow-lg scale-105'
+                                                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                                        }`}
+                                    >
+                                        🏆 รวม (100%)
+                                    </button>
+                                </div>
+                                
+                                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                    <p className="text-sm text-blue-800">
+                                        {scoreDisplayMode === 'app30' && '📊 แสดงเฉพาะคะแนนจากโหวตในแอป (Votes × 400 × 30%)'}
+                                        {scoreDisplayMode === 'purchase70' && '💰 แสดงเฉพาะคะแนนจากซื้อของ (คะแนนซื้อของ × 70%)'}
+                                        {scoreDisplayMode === 'total100' && '🏆 แสดงคะแนนรวมทั้งหมด (App 30% + ซื้อของ 70%)'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ✅ Announcement Settings - NEW */}
+                        <div className="bg-white rounded-2xl p-6 shadow-xl mb-6">
+                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                📢 จัดการประกาศสำคัญ
+                            </h2>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <div className="font-semibold text-gray-800 mb-1">
+                                        ประกาศ (30% / 70%)
+                                    </div>
+                                    <div className="text-sm text-gray-600">
+                                        แสดง/ซ่อนประกาศสำคัญในหน้าผลโหวต
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={toggleAnnouncement}
+                                    className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                                        announcementVisible
+                                            ? 'bg-green-500 hover:bg-green-600 text-white'
+                                            : 'bg-gray-500 hover:bg-gray-600 text-white'
+                                    }`}
+                                >
+                                    {announcementVisible ? '✅ เปิดประกาศ' : '❌ ปิดประกาศ'}
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="bg-white rounded-2xl p-6 shadow-xl">
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-2xl font-bold text-gray-800">👥 จัดการผู้สมัคร</h2>
@@ -844,20 +1227,90 @@ export default function Admin() {
                                 </div>
                             </div>
 
+                            {/* ✅ Bulk Actions - เปิด/ปิดทั้งหมด */}
+                            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 mb-4 border-2 border-blue-200">
+                                <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                                    <span className="text-xl">⚡</span>
+                                    จัดการทั้งหมด (Bulk Actions)
+                                </h3>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <p className="text-xs text-gray-600 mb-2 font-semibold">👁️ แสดง/ซ่อนผู้สมัคร (isVisible)</p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => bulkToggleVisibility(true)}
+                                                className="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all"
+                                            >
+                                                ✅ เปิดทั้งหมด
+                                            </button>
+                                            <button
+                                                onClick={() => bulkToggleVisibility(false)}
+                                                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all"
+                                            >
+                                                ❌ ปิดทั้งหมด
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-600 mb-2 font-semibold">🏆 นับคะแนนใน Podium (isActive)</p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => bulkToggleActive(true)}
+                                                className="flex-1 bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all"
+                                            >
+                                                ✅ เปิดทั้งหมด
+                                            </button>
+                                            <button
+                                                onClick={() => bulkToggleActive(false)}
+                                                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all"
+                                            >
+                                                ❌ ปิดทั้งหมด
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-3 text-xs text-gray-600 bg-amber-50 rounded-lg p-2 border border-amber-200">
+                                    💡 <strong>isVisible</strong>: User จะเห็นและโหวตได้ | <strong>isActive</strong>: นับคะแนนใน Podium
+                                </div>
+                            </div>
+
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
-                                        <tr className="border-b-2 border-gray-200">
+                                        <tr className="border-b-2 border-gray-200 bg-gray-50">
                                             <th className="text-left p-3 font-bold text-gray-700">#</th>
                                             <th className="text-left p-3 font-bold text-gray-700">Sheet ID</th>
                                             <th className="text-left p-3 font-bold text-gray-700">ชื่อ</th>
                                             <th className="text-left p-3 font-bold text-gray-700">คำอธิบาย</th>
                                             <th className="text-center p-3 font-bold text-gray-700">โหวต</th>
+                                            <th className="text-center p-3 font-bold text-blue-700">
+                                                <div>📊 App (30%)</div>
+                                                <div className="text-xs font-normal text-gray-500">voteCount × 400 × 30%</div>
+                                            </th>
+                                            <th className="text-center p-3 font-bold text-purple-700">
+                                                <div>� ซื้อของ (70%)</div>
+                                                <div className="text-xs font-normal text-gray-500">purchasePoints × 70%</div>
+                                            </th>
+                                            <th className="text-center p-3 font-bold text-green-700">
+                                                <div>🏆 รวม (100%)</div>
+                                                <div className="text-xs font-normal text-gray-500">คะแนนรวม</div>
+                                            </th>
+                                            <th className="text-center p-3 font-bold text-gray-700">
+                                                <div>�👁️ แสดง</div>
+                                                <div className="text-xs font-normal text-gray-500">(isVisible)</div>
+                                            </th>
+                                            <th className="text-center p-3 font-bold text-gray-700">
+                                                <div>🏆 Podium</div>
+                                                <div className="text-xs font-normal text-gray-500">(isActive)</div>
+                                            </th>
                                             <th className="text-center p-3 font-bold text-gray-700">จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {candidates.map((candidate, index) => (
+                                        {candidates.map((candidate, index) => {
+                                            const { score30, score70, totalScore } = calculateScores(candidate);
+                                            
+                                            return (
                                             <tr key={candidate.id} className="border-b border-gray-100 hover:bg-gray-50">
                                                 <td className="p-3 text-gray-600">#{index + 1}</td>
                                                 <td className="p-3">
@@ -893,6 +1346,80 @@ export default function Admin() {
                                                         {candidate.voteCount}
                                                     </span>
                                                 </td>
+                                                
+                                                {/* ✅ คะแนน App 30% (ไม่ให้แก้) */}
+                                                <td className="p-3 text-center">
+                                                    <div className="text-blue-600 font-semibold">
+                                                        {score30.toLocaleString()}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {candidate.voteCount || 0} × 400 × 30%
+                                                    </div>
+                                                </td>
+                                                
+                                                {/* ✅ คะแนนซื้อของ 70% (แก้ได้) */}
+                                                <td className="p-3 text-center">
+                                                    <div className="flex items-center gap-2 justify-center">
+                                                        <input
+                                                            type="number"
+                                                            className="w-24 px-2 py-1 border rounded text-center"
+                                                            placeholder="0"
+                                                            value={editingPurchasePoints[candidate.id] ?? candidate.purchasePoints ?? 0}
+                                                            onChange={(e) => 
+                                                                setEditingPurchasePoints(prev => ({
+                                                                    ...prev,
+                                                                    [candidate.id]: parseInt(e.target.value) || 0
+                                                                }))
+                                                            }
+                                                        />
+                                                        <button
+                                                            className="px-2 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                                                            onClick={() => updatePurchasePoints(
+                                                                candidate.id,
+                                                                editingPurchasePoints[candidate.id] ?? candidate.purchasePoints ?? 0
+                                                            )}
+                                                        >
+                                                            💾
+                                                        </button>
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                        = {score70.toLocaleString()} คะแนน
+                                                    </div>
+                                                </td>
+                                                
+                                                {/* ✅ คะแนนรวม 100% */}
+                                                <td className="p-3 text-center">
+                                                    <div className="text-green-600 font-bold text-lg">
+                                                        {totalScore.toLocaleString()}
+                                                    </div>
+                                                </td>
+                                                
+                                                {/* ✅ Toggle isVisible */}
+                                                <td className="p-3 text-center">
+                                                    <button
+                                                        onClick={() => toggleCandidateVisibility(candidate.id, candidate.isVisible ?? false)}
+                                                        className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
+                                                            candidate.isVisible 
+                                                                ? 'bg-green-500 hover:bg-green-600 text-white' 
+                                                                : 'bg-gray-300 hover:bg-gray-400 text-gray-700'
+                                                        }`}
+                                                    >
+                                                        {candidate.isVisible ? '✅ เปิด' : '❌ ปิด'}
+                                                    </button>
+                                                </td>
+                                                {/* ✅ Toggle isActive */}
+                                                <td className="p-3 text-center">
+                                                    <button
+                                                        onClick={() => toggleCandidateActive(candidate.id, candidate.isActive ?? false)}
+                                                        className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
+                                                            candidate.isActive 
+                                                                ? 'bg-purple-500 hover:bg-purple-600 text-white' 
+                                                                : 'bg-orange-300 hover:bg-orange-400 text-gray-700'
+                                                        }`}
+                                                    >
+                                                        {candidate.isActive ? '🏆 นับ' : '⏸️ ไม่นับ'}
+                                                    </button>
+                                                </td>
                                                 <td className="p-3 text-center">
                                                     <button
                                                         onClick={() => handleDeleteCandidate(candidate.id, candidate.name)}
@@ -902,7 +1429,8 @@ export default function Admin() {
                                                     </button>
                                                 </td>
                                             </tr>
-                                        ))}
+                                        );
+                                        })}
                                     </tbody>
                                 </table>
 

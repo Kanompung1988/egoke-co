@@ -3,7 +3,7 @@ import { getAllUsers, setUserRole, isSuperAdmin, db } from '../firebaseApp';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../components/contexts/AuthContext';
 import { useToast } from '../components/contexts/ToastContext';
-import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, Timestamp, collection, onSnapshot } from 'firebase/firestore';
 import { useVoteSettings } from '../hooks/useVote';
 import type { VoteCategory } from '../hooks/useVote';
 import ActivityLogsViewer from '../components/ActivityLogsViewer';
@@ -15,6 +15,11 @@ interface UserData {
     displayName: string;
     role: string;
     points: number;
+    attendance?: {
+        day1?: boolean;
+        day2?: boolean;
+        day3?: boolean;
+    };
 }
 
 export default function SuperAdmin() {
@@ -57,38 +62,56 @@ export default function SuperAdmin() {
         });
     }, [authLoading, currentUser, loading]);
 
-    // เช็คสิทธิ์ SuperAdmin
+    // เช็คสิทธิ์ SuperAdmin หรือ Register
     useEffect(() => {
         if (!authLoading) {
             const userEmail = currentUser?.email || null;
-            if (!currentUser || !isSuperAdmin(userEmail)) {
+            const userRole = currentUser?.role || '';
+            // ✅ อนุญาตให้ SuperAdmin และ Register เข้าได้
+            if (!currentUser || (!isSuperAdmin(userEmail) && userRole !== 'register')) {
                 showError('คุณไม่มีสิทธิ์เข้าถึงหน้านี้');
                 navigate('/');
             }
         }
     }, [currentUser, authLoading, navigate, showError]);
 
-    // โหลดรายชื่อ users ทั้งหมด
+    // โหลดรายชื่อ users ทั้งหมด แบบ Real-time
     useEffect(() => {
-        async function loadUsers() {
-            try {
-                setLoading(true);
-                const allUsers = await getAllUsers();
-                setUsers(allUsers);
-            } catch (error) {
+        if (!currentUser || authLoading) return;
+        
+        const userEmail = currentUser.email || null;
+        if (!isSuperAdmin(userEmail)) return;
+
+        setLoading(true);
+        
+        // ใช้ onSnapshot เพื่อ Real-time update
+        const usersRef = collection(db, 'users');
+        const unsubscribe = onSnapshot(
+            usersRef,
+            (snapshot) => {
+                const usersData: UserData[] = [];
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    usersData.push({
+                        uid: doc.id,
+                        email: data.email || '',
+                        displayName: data.displayName || '',
+                        role: data.role || 'user',
+                        points: data.points || 0,
+                        attendance: data.attendance || {}
+                    });
+                });
+                setUsers(usersData);
+                setLoading(false);
+            },
+            (error) => {
                 console.error('Error loading users:', error);
                 setMessage('❌ ไม่สามารถโหลดข้อมูลผู้ใช้ได้');
-            } finally {
                 setLoading(false);
             }
-        }
-        
-        if (currentUser && !authLoading) {
-            const userEmail = currentUser.email || null;
-            if (isSuperAdmin(userEmail)) {
-                loadUsers();
-            }
-        }
+        );
+
+        return () => unsubscribe();
     }, [currentUser, authLoading]);
 
     const handleUpdateRole = async (email?: string, role?: 'user' | 'staff' | 'admin') => {
@@ -255,7 +278,34 @@ export default function SuperAdmin() {
         superadmin: users.filter(u => u.role === 'superadmin').length,
         admin: users.filter(u => u.role === 'admin').length,
         staff: users.filter(u => u.role === 'staff').length,
+        register: users.filter(u => u.role === 'register').length,
         user: users.filter(u => u.role === 'user').length,
+    };
+
+    // สรุปจำนวนคนเข้างานแต่ละวัน (นับจาก User ทั้งหมด ไม่จำกัดยศ)
+    const allUsers = users; // นับทุกคน
+    const attendanceStats = {
+        day1: {
+            checked: allUsers.filter(u => u.attendance?.day1 === true).length,
+            total: allUsers.length,
+            percentage: allUsers.length > 0 
+                ? Math.round((allUsers.filter(u => u.attendance?.day1 === true).length / allUsers.length) * 100)
+                : 0
+        },
+        day2: {
+            checked: allUsers.filter(u => u.attendance?.day2 === true).length,
+            total: allUsers.length,
+            percentage: allUsers.length > 0 
+                ? Math.round((allUsers.filter(u => u.attendance?.day2 === true).length / allUsers.length) * 100)
+                : 0
+        },
+        day3: {
+            checked: allUsers.filter(u => u.attendance?.day3 === true).length,
+            total: allUsers.length,
+            percentage: allUsers.length > 0 
+                ? Math.round((allUsers.filter(u => u.attendance?.day3 === true).length / allUsers.length) * 100)
+                : 0
+        }
     };
 
     if (authLoading || loading || categoriesLoading) {
@@ -341,8 +391,65 @@ export default function SuperAdmin() {
                 {/* Users Tab */}
                 {activeTab === 'users' && (
                     <>
+                        {/* Attendance Summary Cards - D1, D2, D3 */}
+                        <div className="grid grid-cols-3 gap-4 mb-6">
+                            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 shadow-2xl text-white transform hover:scale-105 transition-all">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <div className="text-sm font-medium opacity-90 mb-1">วันที่ 1</div>
+                                        <div className="text-4xl font-bold">D1</div>
+                                    </div>
+                                    <div className="text-5xl opacity-80">📅</div>
+                                </div>
+                                <div className="bg-white/20 rounded-xl p-4 backdrop-blur-sm">
+                                    <div className="flex items-baseline gap-2 mb-1">
+                                        <span className="text-3xl font-bold">{attendanceStats.day1.checked}</span>
+                                        <span className="text-lg opacity-80">/ {attendanceStats.day1.total}</span>
+                                    </div>
+                                    <div className="text-sm opacity-90">ผู้เข้าร่วม (ทุกคน)</div>
+                                    <div className="mt-2 text-2xl font-bold text-yellow-300">{attendanceStats.day1.percentage}%</div>
+                                </div>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 shadow-2xl text-white transform hover:scale-105 transition-all">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <div className="text-sm font-medium opacity-90 mb-1">วันที่ 2</div>
+                                        <div className="text-4xl font-bold">D2</div>
+                                    </div>
+                                    <div className="text-5xl opacity-80">📅</div>
+                                </div>
+                                <div className="bg-white/20 rounded-xl p-4 backdrop-blur-sm">
+                                    <div className="flex items-baseline gap-2 mb-1">
+                                        <span className="text-3xl font-bold">{attendanceStats.day2.checked}</span>
+                                        <span className="text-lg opacity-80">/ {attendanceStats.day2.total}</span>
+                                    </div>
+                                    <div className="text-sm opacity-90">ผู้เข้าร่วม (ทุกคน)</div>
+                                    <div className="mt-2 text-2xl font-bold text-yellow-300">{attendanceStats.day2.percentage}%</div>
+                                </div>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 shadow-2xl text-white transform hover:scale-105 transition-all">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <div className="text-sm font-medium opacity-90 mb-1">วันที่ 3</div>
+                                        <div className="text-4xl font-bold">D3</div>
+                                    </div>
+                                    <div className="text-5xl opacity-80">📅</div>
+                                </div>
+                                <div className="bg-white/20 rounded-xl p-4 backdrop-blur-sm">
+                                    <div className="flex items-baseline gap-2 mb-1">
+                                        <span className="text-3xl font-bold">{attendanceStats.day3.checked}</span>
+                                        <span className="text-lg opacity-80">/ {attendanceStats.day3.total}</span>
+                                    </div>
+                                    <div className="text-sm opacity-90">ผู้เข้าร่วม (ทุกคน)</div>
+                                    <div className="mt-2 text-2xl font-bold text-yellow-300">{attendanceStats.day3.percentage}%</div>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Statistics Cards */}
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
                             <div className="bg-white rounded-xl p-4 shadow-lg text-center">
                                 <i className="ri-group-line text-3xl mb-2 text-gray-600"></i>
                                 <div className="text-2xl font-bold text-gray-800">{userStats.total}</div>
@@ -362,6 +469,11 @@ export default function SuperAdmin() {
                                 <i className="ri-user-star-line text-3xl mb-2 text-green-600"></i>
                                 <div className="text-2xl font-bold text-green-700">{userStats.staff}</div>
                                 <div className="text-sm text-green-600">Staff</div>
+                            </div>
+                            <div className="bg-yellow-50 rounded-xl p-4 shadow-lg text-center border-2 border-yellow-200">
+                                <i className="ri-user-add-line text-3xl mb-2 text-yellow-600"></i>
+                                <div className="text-2xl font-bold text-yellow-700">{userStats.register}</div>
+                                <div className="text-sm text-yellow-600">Register</div>
                             </div>
                             <div className="bg-gray-50 rounded-xl p-4 shadow-lg text-center border-2 border-gray-200">
                                 <i className="ri-user-line text-3xl mb-2 text-gray-600"></i>

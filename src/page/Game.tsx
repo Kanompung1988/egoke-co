@@ -34,7 +34,7 @@ type HistoryItem = {
     claimedBy?: string; // UID ของคนที่เคลม
 };
 
-const DEFAULT_SPIN_COST = 20;
+const DEFAULT_SPIN_COST = 30;
 
 export default function Game() {
     const [user, setUser] = useState<User | null>(null);
@@ -54,11 +54,10 @@ export default function Game() {
         () => [
             { label: "ตุ๊กตาใหญ่", emoji: "🧸🧸🧸", color: "#dc2626", probability: 0.1 },
             { label: "ตุ๊กตาไซส์เล็ก", emoji: "🧸", color: "#ef4444", probability: 2.9 },
-            { label: "ตั๋วเล่นกิจกรรมฟรี", emoji: "🎫", color: "#dc2626", probability: 35.0 },
-            { label: "คูปองสปอนเซอร์", emoji: "🎟️", color: "#ef4444", probability: 30.0 },
-            { label: "ตั๋วโหวตฟรี", emoji: "🗳️", color: "#dc2626", probability: 10.0 },
-            { label: "ขนมสปอนเซอร์", emoji: "🍬", color: "#ef4444", probability: 5.0 },
-            { label: "ขนมกรุบกรอบปลอบใจ", emoji: "🍪", color: "#dc2626", probability: 17.0 },
+            { label: "คูปองสปอนเซอร์", emoji: "🎟️", color: "#dc2626", probability: 30.0 },
+            { label: "ตั๋วโหวตฟรี", emoji: "🗳️", color: "#ef4444", probability: 40.0 },
+            { label: "ขนมสปอนเซอร์", emoji: "🍬", color: "#dc2626", probability: 10.0 },
+            { label: "ขนมกรุบกรอบปลอบใจ", emoji: "🍪", color: "#ef4444", probability: 17.0 },
         ],
         []
     );
@@ -214,25 +213,45 @@ export default function Game() {
                 DEFAULT_SPIN_COST
             );
 
-            // 2. ✅ Save to History Subcollection
+            // 2. ✅ Save to Tickets Collection (Best Practice - เร็วและง่ายต่อการค้นหา)
             const ticketId = generateTicketId();
-            const historyEntry: Omit<HistoryItem, 'id'> = { // Data to save (without id)
+            const ticketData = {
+                ticketId: ticketId,
+                userId: uid,
+                userEmail: user.email || '',
+                userName: user.displayName || 'Unknown',
                 prize: winningPrize,
                 emoji: winningEmoji,
-                timestamp: Date.now(), // Use current timestamp
+                timestamp: Date.now(),
+                claimed: false,
+                claimedAt: null,
+                claimedBy: null,
+                createdAt: Date.now()
+            };
+            
+            // บันทึกลง tickets collection (global)
+            const ticketsCollectionRef = collection(db, "tickets");
+            await addDoc(ticketsCollectionRef, ticketData);
+            console.log("✅ Ticket created:", ticketId);
+
+            // 3. ✅ Save to User History Subcollection (เก็บไว้ดูประวัติ)
+            const historyEntry: Omit<HistoryItem, 'id'> = {
+                prize: winningPrize,
+                emoji: winningEmoji,
+                timestamp: Date.now(),
                 ticketId: ticketId,
-                claimed: false, // เพิ่ม: ยังไม่ได้เคลมรางวัล
+                claimed: false,
             };
 
             const historyCollectionRef = collection(db, "users", uid, "history");
             const newHistoryDocRef = await addDoc(historyCollectionRef, historyEntry);
-            console.log("History saved with ID:", newHistoryDocRef.id); // Debug log
+            console.log("✅ History saved with ID:", newHistoryDocRef.id);
 
-            // 3. Update local history state (add new item to the top, keep limit)
+            // 4. Update local history state (add new item to the top, keep limit)
             setHistory(prev => [{ ...historyEntry, id: newHistoryDocRef.id }, ...prev].slice(0, 20));
 
 
-            // 4. Show prize modal
+            // 5. Show prize modal
             setWonPrize({ label: winningPrize, emoji: winningEmoji ?? "🎁" });
             setShowPrizeModal(true);
 

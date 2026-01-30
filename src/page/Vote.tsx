@@ -29,9 +29,16 @@ export default function Vote() {
     const [votedCandidate, setVotedCandidate] = useState<Candidate | null>(null);
     const [notificationEnabled, setNotificationEnabled] = useState(false);
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+    
+    // ✅ เพิ่ม State สำหรับจำนวนโหวต
+    const [selectedVotes, setSelectedVotes] = useState<{ [key: string]: number }>({});
 
     const { categories: voteSettings, loading: settingsLoading } = useVoteSettings();
-    const { candidates, loading: candidatesLoading } = useCandidates(selectedCategory);
+    const { candidates: allCandidates, loading: candidatesLoading } = useCandidates(selectedCategory);
+    
+    // ✅ Filter เฉพาะผู้สมัครที่ isVisible = true
+    const candidates = allCandidates.filter(c => c.isVisible === true);
+    
     const categorySettings = voteSettings[selectedCategory];
     const sessionId = categorySettings?.sessionId || 'default';
     const { voteRights } = useVoteRights(currentUser?.uid);
@@ -137,10 +144,38 @@ export default function Vote() {
         }
     }, [voteHistory, candidates]);
 
+    // ✅ ฟังก์ชันเปลี่ยนจำนวนโหวต
+    const updateVoteCount = (candidateId: string, count: number) => {
+        const maxVotes = currentCategoryRights || 0;
+        const totalSelected = Object.values(selectedVotes).reduce((sum, v) => sum + v, 0) - (selectedVotes[candidateId] || 0);
+        
+        if (totalSelected + count > maxVotes) {
+            alert(`คุณมีสิทธิ์โหวตเหลือ ${maxVotes - totalSelected} ครั้ง`);
+            return;
+        }
+        
+        if (count < 0) {
+            return;
+        }
+        
+        setSelectedVotes(prev => ({
+            ...prev,
+            [candidateId]: count
+        }));
+    };
+
     const handleVoteClick = (candidate: Candidate) => {
+        const voteCount = selectedVotes[candidate.id] || 0;
+        
+        // Check ว่าเลือกจำนวนโหวตหรือยัง
+        if (voteCount === 0) {
+            alert('กรุณาเลือกจำนวนโหวต');
+            return;
+        }
+
         // Check if user has vote rights
-        if (currentCategoryRights <= 0) {
-            if (confirm('คุณไม่มีสิทธิ์โหวตในหมวดนี้แล้ว\n\nต้องการซื้อสิทธิ์เพิ่มหรือไม่?')) {
+        if (currentCategoryRights < voteCount) {
+            if (confirm(`คุณมีสิทธิ์โหวตเหลือ ${currentCategoryRights} ครั้ง\n\nต้องการซื้อสิทธิ์เพิ่มหรือไม่?`)) {
                 setShowPurchaseModal(true);
             }
             return;
@@ -154,30 +189,48 @@ export default function Vote() {
 
     const handleConfirmVote = async () => {
         if (!selectedCandidate || !currentUser) return;
+        
+        const voteCount = selectedVotes[selectedCandidate.id] || 0;
+        if (voteCount === 0) {
+            alert('กรุณาเลือกจำนวนโหวต');
+            return;
+        }
 
         setVotingInProgress(true);
         try {
-            const result = await submitVoteWithRights(
-                currentUser.uid,
-                currentUser.email || '',
-                currentUser.displayName || 'Anonymous',
-                selectedCandidate.id,
-                selectedCategory,
-                sessionId
-            );
+            // ✅ โหวตหลายครั้งพร้อมกัน
+            for (let i = 0; i < voteCount; i++) {
+                const result = await submitVoteWithRights(
+                    currentUser.uid,
+                    currentUser.email || '',
+                    currentUser.displayName || 'Anonymous',
+                    selectedCandidate.id,
+                    selectedCategory,
+                    sessionId
+                );
 
-            if (result.success) {
-                setShowConfirmModal(false);
-                setVotedCandidate(selectedCandidate);
-                setShowVoteSuccess(true);
-
-                // Sync to Google Sheets if available
-                if (selectedCandidate.sheetId) {
-                    await syncVoteToSheet(selectedCandidate.sheetId, selectedCandidate.voteCount + 1);
+                if (!result.success) {
+                    alert(result.message || 'เกิดข้อผิดพลาดในการโหวต');
+                    setVotingInProgress(false);
+                    return;
                 }
-            } else {
-                alert(result.message || 'เกิดข้อผิดพลาดในการโหวต');
             }
+
+            setShowConfirmModal(false);
+            setVotedCandidate(selectedCandidate);
+            setShowVoteSuccess(true);
+
+            // Sync to Google Sheets if available
+            if (selectedCandidate.sheetId) {
+                await syncVoteToSheet(selectedCandidate.sheetId, selectedCandidate.voteCount + voteCount);
+            }
+            
+            // รีเซ็ตจำนวนโหวต
+            setSelectedVotes(prev => ({
+                ...prev,
+                [selectedCandidate.id]: 0
+            }));
+
         } catch (error) {
             console.error('Failed to submit vote:', error);
             alert('เกิดข้อผิดพลาดในการโหวต กรุณาลองใหม่อีกครั้ง');
@@ -530,6 +583,34 @@ export default function Vote() {
                         </div>
                     )}
 
+                    {/* Vote Summary Bar - แสดงยอดรวมโหวตที่เลือก */}
+                    {!isLoading && isOpen && (() => {
+                        const totalSelected = Object.values(selectedVotes).reduce((sum, count) => sum + count, 0);
+                        return totalSelected > 0 ? (
+                            <div className="bg-gradient-to-r from-red-600 to-red-700 text-white rounded-2xl p-4 mb-4 shadow-xl animate-fade-in">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-3xl">🗳️</div>
+                                        <div>
+                                            <div className="font-bold text-lg">
+                                                เลือกโหวตทั้งหมด {totalSelected} ครั้ง
+                                            </div>
+                                            <div className="text-sm text-red-100">
+                                                เหลือสิทธิ์ {currentCategoryRights - totalSelected} ครั้ง
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setSelectedVotes({})}
+                                        className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg font-bold transition-all active:scale-95"
+                                    >
+                                        ล้างทั้งหมด
+                                    </button>
+                                </div>
+                            </div>
+                        ) : null;
+                    })()}
+
                     {/* Content - Candidates Only for Users */}
                     {!isLoading && isOpen && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
@@ -570,6 +651,49 @@ export default function Vote() {
                                         <p className="text-sm text-gray-600 mb-4 line-clamp-2">
                                             {candidate.description}
                                         </p>
+
+                                        {/* Vote Quantity Selector */}
+                                        {currentCategoryRights > 0 && (
+                                            <div className="mb-3 bg-gray-50 rounded-xl p-3">
+                                                <div className="text-xs text-gray-600 mb-2 text-center">
+                                                    จำนวนโหวตที่ต้องการให้
+                                                </div>
+                                                <div className="flex items-center justify-center gap-3">
+                                                    <button
+                                                        onClick={() => {
+                                                            const current = selectedVotes[candidate.id] || 0;
+                                                            if (current > 0) {
+                                                                updateVoteCount(candidate.id, current - 1);
+                                                            }
+                                                        }}
+                                                        className="w-10 h-10 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold text-lg transition-all active:scale-95"
+                                                        disabled={!selectedVotes[candidate.id] || selectedVotes[candidate.id] === 0}
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max={currentCategoryRights}
+                                                        value={selectedVotes[candidate.id] || 0}
+                                                        onChange={(e) => {
+                                                            const value = Math.max(0, Math.min(currentCategoryRights, parseInt(e.target.value) || 0));
+                                                            updateVoteCount(candidate.id, value);
+                                                        }}
+                                                        className="w-16 h-10 text-center text-xl font-bold border-2 border-gray-300 rounded-lg focus:border-red-500 focus:outline-none"
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            const current = selectedVotes[candidate.id] || 0;
+                                                            updateVoteCount(candidate.id, current + 1);
+                                                        }}
+                                                        className="w-10 h-10 bg-red-500 hover:bg-red-600 text-white rounded-lg font-bold text-lg transition-all active:scale-95"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* Vote Button */}
                                         {currentCategoryRights > 0 ? (

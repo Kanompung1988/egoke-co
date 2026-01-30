@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import type { User } from "firebase/auth";
 import BottomNav from "../components/BottomNav";
 import { LuJapaneseYen, LuSend, LuImage, LuUser, LuMessageSquare, LuShield, LuCalendar, LuActivity, LuTriangleAlert, LuCheck, LuX } from 'react-icons/lu';
+import { useIGPageSettings } from "../hooks/useIGPageSettings";
 
 import { db, watchAuthState, getUserProfile, deductPointsFromUser } from "../firebaseApp";
 import { doc, onSnapshot, updateDoc, increment, getDoc, writeBatch } from "firebase/firestore";
@@ -45,6 +46,8 @@ const rules = [
 ];
 
 export default function Contact() {
+    const { settings: igPageSettings, loading: igPageLoading } = useIGPageSettings();
+    
     const [title, setTitle] = useState<string>("");
     const [subtitle, setSubtitle] = useState<string>("");
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -67,6 +70,9 @@ export default function Contact() {
 
     const [activeTab, setActiveTab] = useState<"status" | "schedule" | "rules">("status");
     const [showRulesConfirmModal, setShowRulesConfirmModal] = useState<boolean>(false);
+    
+    // Check if user is staff/admin - ใช้ userRole จาก state
+    const isStaff = ['staff', 'admin', 'superadmin'].includes(userRole || '');
 
     useEffect(() => {
         const unsubscribe = watchAuthState(async (currentUser) => {
@@ -272,6 +278,46 @@ export default function Contact() {
             </div>
 
             <BottomNav />
+            
+            {/* Loading IG Page Settings */}
+            {igPageLoading && (
+                <div className="relative z-10 flex items-center justify-center min-h-screen">
+                    <div className="text-center">
+                        <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-white border-t-transparent mb-4"></div>
+                        <p className="text-white text-lg">กำลังตรวจสอบสถานะ...</p>
+                    </div>
+                </div>
+            )}
+            
+            {/* ถ้าหน้า IG ปิดและไม่ใช่ Staff */}
+            {!igPageLoading && !igPageSettings.isOpen && !isStaff && (
+                <div className="relative z-10 container mx-auto px-4 py-16">
+                    <div className="max-w-2xl mx-auto">
+                        <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 text-center animate-fade-in">
+                            <div className="text-8xl mb-6">🔒</div>
+                            <h2 className="text-3xl font-bold text-gray-800 mb-4">หน้า IG ปิดให้บริการ</h2>
+                            <p className="text-lg text-gray-600 mb-6 leading-relaxed">
+                                ขออภัย ขณะนี้หน้า IG ปิดให้บริการชั่วคราว
+                            </p>
+                            {igPageSettings.message && (
+                                <div className="bg-amber-50 border-l-4 border-amber-400 rounded-lg p-4 mb-6">
+                                    <p className="text-sm text-amber-800 text-left">
+                                        <span className="font-bold">📌 ข้อความจากแอดมิน:</span> {igPageSettings.message}
+                                    </p>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-center gap-2 text-gray-500">
+                                <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                                <span className="font-semibold">กรุณารอประกาศ</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* แสดงเนื้อหาปกติถ้าเปิด หรือผู้ใช้เป็น Staff */}
+            {!igPageLoading && (igPageSettings.isOpen || isStaff) && (
+                <>
 
             {/* Loading Overlays */}
             {loading && (
@@ -588,6 +634,8 @@ export default function Contact() {
                         </div>
                     </div>
                 </div>
+            )}
+            </>
             )}
         </div>
     );

@@ -235,22 +235,24 @@ export async function logAttendanceCheck(
     checked: boolean,
     checkedBy: string,
     checkedByEmail: string,
-    points: number
+    pointsBefore: number,
+    pointsAfter: number
 ): Promise<void> {
     await logActivity({
         userId,
         userEmail,
         userName,
-        type: 'POINT_GRANT',
+        type: 'CHECKIN',
         description: checked 
-            ? `เช็คเข้างาน ${day} โดย ${checkedByEmail}` 
-            : `ยกเลิกเช็คเข้างาน ${day} โดย ${checkedByEmail}`,
-        pointsBefore: points,
-        pointsAfter: points,
+            ? `เช็คอิน ${day}` 
+            : `ยกเลิกเช็คอิน ${day}`,
+        pointsBefore,
+        pointsAfter,
         metadata: {
-            reason: `Attendance: ${day}`,
-            grantedBy: checkedBy,
-            grantedByEmail: checkedByEmail,
+            day,
+            checked,
+            checkedBy,
+            checkedByEmail,
             isAdminAction: true,
         },
     });

@@ -23,7 +23,7 @@ export default function BottomNav() {
         { path: "/profile", icon: "ri-user-line", label: "โปรไฟล์" },
     ];
 
-    // เพิ่มปุ่มตาม Role - QR/Register อยู่ข้างโหวต (ฝั่งซ้าย)
+    // เพิ่มปุ่มตาม Role
     if (isAdmin) {
         // Admin/SuperAdmin เห็นปุ่ม "สแกน QR" ข้างโหวต และ "จัดการ" ฝั่งขวา
         leftItems.push({ path: "/qrscan", icon: "ri-qr-scan-2-line", label: "สแกน QR" });
@@ -32,8 +32,9 @@ export default function BottomNav() {
         // Staff เห็นปุ่ม "สแกน QR" ข้างโหวต
         leftItems.push({ path: "/qrscan", icon: "ri-qr-scan-2-line", label: "สแกน QR" });
     } else if (isRegister) {
-        // Register เห็นปุ่ม "เช็คเข้างาน" ข้างโหวต
-        leftItems.push({ path: "/register", icon: "ri-clipboard-line", label: "เช็คเข้างาน" });
+        // Register เห็นปุ่ม "สแกน QR" (RegisterScan) ข้างโหวต + "เช็คชื่อ" ฝั่งขวา
+        leftItems.push({ path: "/register-scan", icon: "ri-qr-scan-2-line", label: "สแกน" });
+        rightItems.unshift({ path: "/register", icon: "ri-file-list-3-line", label: "เช็คชื่อ" });
     }
 
     return (

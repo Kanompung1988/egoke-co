@@ -16,6 +16,7 @@ import {
     setDoc,
     updateDoc,
     increment,
+    serverTimestamp,
     collection,
     query,
     where,
@@ -262,7 +263,8 @@ export async function addPointsToUser(uid: string, pointsToAdd: number) {
     const userRef = doc(db, "users", uid);
     try {
         await updateDoc(userRef, {
-            points: increment(pointsToAdd)
+            points: increment(pointsToAdd),
+            updatedAt: serverTimestamp() // ✅ เพิ่ม updatedAt เพื่อให้ Staff สามารถเพิ่มแต้มได้
         });
         console.log(`✅ Added ${pointsToAdd} points to user ${uid}`);
         const updatedDoc = await getDoc(userRef);
@@ -280,7 +282,8 @@ export async function deductPointsFromUser(uid: string, pointsToDeduct: number) 
     const userRef = doc(db, "users", uid);
     try {
         await updateDoc(userRef, {
-            points: increment(-pointsToDeduct)
+            points: increment(-pointsToDeduct),
+            updatedAt: serverTimestamp() // ✅ เพิ่ม updatedAt เพื่อให้ Staff สามารถลดแต้มได้
         });
         console.log(`✅ Deducted ${pointsToDeduct} points from user ${uid}`);
         const updatedDoc = await getDoc(userRef);

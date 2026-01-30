@@ -41,6 +41,9 @@ export interface Candidate {
     voteCount: number;
     order: number;
     sheetId?: number | string;
+    isVisible: boolean; // แสดงให้ User เห็นและโหวตได้
+    isActive: boolean;  // นับคะแนนใน Podium
+    purchasePoints?: number; // ✅ คะแนนซื้อของ (70%)
 }
 
 export interface VoteRecord {
@@ -334,7 +337,7 @@ export function useRealTimeVoteCount(category: string, sessionId: string) {
  * Hook to get user's vote rights for each category
  */
 export function useVoteRights(userId: string | undefined) {
-    const [voteRights, setVoteRights] = useState<VoteRights>({ band: 1, solo: 1, cover: 1 });
+    const [voteRights, setVoteRights] = useState<VoteRights>({ band: 1, solo: 1, cover: 1 }); // Default ฟรี 1 ครั้ง
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -348,9 +351,9 @@ export function useVoteRights(userId: string | undefined) {
         const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
             if (snapshot.exists()) {
                 const data = snapshot.data();
-                setVoteRights(data.voteRights || { band: 1, solo: 1, cover: 1 });
+                setVoteRights(data.voteRights || { band: 1, solo: 1, cover: 1 }); // ถ้าไม่มีให้ฟรี 1
             } else {
-                setVoteRights({ band: 1, solo: 1, cover: 1 });
+                setVoteRights({ band: 1, solo: 1, cover: 1 }); // User ใหม่ได้ฟรี 1
             }
             setLoading(false);
         });
@@ -389,7 +392,7 @@ export async function purchaseVoteRights(
 
             const userData = userDoc.data();
             const currentPoints = userData.points || 0;
-            const currentRights = userData.voteRights || { band: 1, solo: 1, cover: 1 };
+            const currentRights = userData.voteRights || { band: 1, solo: 1, cover: 1 }; // Default ฟรี 1
 
             if (currentPoints < totalCost) {
                 throw new Error(`แต้มไม่เพียงพอ (ต้องการ ${totalCost} แต้ม, มีอยู่ ${currentPoints} แต้ม)`);
@@ -398,7 +401,7 @@ export async function purchaseVoteRights(
             const newPoints = currentPoints - totalCost;
             const newRights = {
                 ...currentRights,
-                [category]: (currentRights[category] || 1) + rightsAmount
+                [category]: (currentRights[category] || 0) + rightsAmount // บวกตรงๆ ไม่ +1 เพิ่ม
             };
 
             // Update user document

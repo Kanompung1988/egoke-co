@@ -33,14 +33,20 @@ export interface VoteRightsPurchase {
 
 export interface ActivityLog {
     id: string;
-    userId: string;
-    userEmail: string;
-    userName: string;
-    type: 'POINT_GRANT' | 'POINT_DEDUCT' | 'VOTE_CAST' | 'VOTE_RIGHTS_PURCHASE' | 'PRIZE_CLAIM' | 'GAME_SPIN' | 'ADMIN_ADJUST';
-    description: string;
-    pointsBefore: number;
-    pointsAfter: number;
-    pointsChange: number;
+    userId?: string;
+    userEmail?: string;
+    userName?: string;
+    type: 'POINT_GRANT' | 'POINT_DEDUCT' | 'VOTE_CAST' | 'VOTE_RIGHTS_PURCHASE' | 'PRIZE_CLAIM' | 'GAME_SPIN' | 'ADMIN_ADJUST' | 'CHECKIN' | 'grant_free_vote';
+    description?: string;
+    message?: string;
+    pointsBefore?: number;
+    pointsAfter?: number;
+    pointsChange?: number;
+    adminId?: string;
+    adminEmail?: string;
+    adminName?: string;
+    category?: string;
+    affectedUsers?: number;
     metadata?: {
         category?: string;
         candidateId?: string;
@@ -59,6 +65,10 @@ export interface ActivityLog {
         prizeEmoji?: string;
         spinCost?: number;
         isAdminAction?: boolean;
+        day?: string;
+        checked?: boolean;
+        checkedBy?: string;
+        checkedByEmail?: string;
     };
     timestamp: Timestamp;
     ipAddress?: string;
